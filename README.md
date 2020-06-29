@@ -3,6 +3,14 @@
 You can find downloads in [Releases](https://github.com/KibbleLands/KibblePatcher/releases)  
 Please read [LICENCE](https://github.com/Fox2Code/Repacker/blob/master/LICENSE) before using the software
 
+## How to use
+
+1. Get you server .jar and KibblePatcher.jar  
+(The latests verions of Paper provide a patcher jar that is not the real server jar  
+please launch it one time and get the file named `/cache/patched_X.jar` instead)
+2. Run the command `java -jar KibblePatcher.jar server.jar server-patched.jar`
+3. Use the `server-patched.jar` as a normal server jar
+
 ## Features
 
 ### Servers optimisations
