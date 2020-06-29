@@ -1,0 +1,38 @@
+import org.gradle.api.internal.tasks.DefaultTaskDependency
+
+plugins {
+    id 'java'
+}
+
+group 'org.example'
+version '1.0.0'
+
+repositories {
+    mavenCentral()
+}
+
+configurations {
+    shadow
+}
+
+jar {
+    manifest {
+        attributes 'Main-Class': 'fr.kibblesland.patcher.Main'
+    }
+    from {
+        configurations.shadow.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    exclude("module-info.class")
+}
+
+dependencies {
+    testCompile group: 'junit', name: 'junit', version: '4.12'
+    implementation 'org.ow2.asm:asm-commons:8.0.1'
+    shadow 'org.ow2.asm:asm-commons:8.0.1'
+}
+/*
+jar.enabled = false
+
+(build.getTaskDependencies() as DefaultTaskDependency).getMutableValues().clear()
+build.dependsOn(finalJar, test)
+ */
