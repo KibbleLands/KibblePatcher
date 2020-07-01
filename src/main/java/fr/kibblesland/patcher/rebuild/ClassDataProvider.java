@@ -5,12 +5,16 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 
 import java.lang.reflect.Modifier;
+import java.lang.reflect.Type;
+import java.security.SecureClassLoader;
 import java.util.*;
 
 import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
 import static org.objectweb.asm.Opcodes.ASM6;
 
 public class ClassDataProvider {
+    private static final ClassLoader BOOTSTRAP_CLASS_LOADER = new SecureClassLoader(null) {};
+
     private static final ClData object;
     private static final ClData objectArray;
 
@@ -224,7 +228,21 @@ public class ClassDataProvider {
                 }
             }, ClassReader.SKIP_CODE);
         } catch (Exception e) {
-            clData.superClass = "java/lang/Object";
+            try { // Try to use the boot class loader (Help fix issues on Java9+)
+                Class<?> cl = Class.forName(clName.replace('/','.'), false, BOOTSTRAP_CLASS_LOADER);
+                clData.access = cl.getModifiers();
+                clData.superClass = cl.getGenericSuperclass().getTypeName().replace('.','/');
+                Type[] classes = cl.getGenericInterfaces();
+                if (classes.length != 0) {
+                    String[] interfaces = new String[classes.length];
+                    for (int i = 0; i < interfaces.length;i++) {
+                        interfaces[i] = classes[i].getTypeName().replace('.','/');
+                    }
+                    ((ClData2) clData).interfaces = Arrays.asList(interfaces);
+                }
+            } catch (Exception e2) {
+                clData.superClass = "java/lang/Object";
+            }
         }
         clDataHashMap.put(clName,clData);
         return clData;

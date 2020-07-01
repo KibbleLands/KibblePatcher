@@ -30,6 +30,15 @@ public class ASMUtils {
         return null;
     }
 
+    public static MethodNode findMethodBySignature(ClassNode classNode,String signature) {
+        for (MethodNode methodNode:classNode.methods) {
+            if ((!methodNode.name.startsWith("<")) && signature.equals(methodNode.signature)) {
+                return methodNode;
+            }
+        }
+        return null;
+    }
+
     /**
      * @param methodNode The patched method
      * @param from Original instruction
@@ -49,7 +58,7 @@ public class ASMUtils {
     }
 
     public static boolean equals(AbstractInsnNode insn1,AbstractInsnNode insn2) {
-        return insn1.getOpcode() == insn2.getOpcode() && insn1.getClass().equals(insn2.getClass())
+        return insn1.getOpcode() == insn2.getOpcode()
                 && (!(insn1 instanceof IntInsnNode) || ((IntInsnNode) insn1).operand == ((IntInsnNode) insn2).operand);
     }
 }

@@ -23,6 +23,14 @@ Server specific patches also help your server run better even without plugins
 
 Add back commonly used APIs by old plugins to ensure maximum compatibility with all your plugins
 
+### Server zip compression
+
+Reduce ZIP size by compressing better files and removing unnecessary bytes
+
+### Reduce outdated time delay
+
+Change the wait time from `20` seconds to `5` seconds when the server detects that the build is outdated
+
 ## Server Compatibility
 
 This patcher should support all Bukkit/Spigot/Paper but most of the optimisations in this patcher target the latest versions of minecraft

@@ -21,7 +21,7 @@ public class Main implements Opcodes {
     private static final String CRAFT_BUKKIT_MAIN = "org/bukkit/craftbukkit/Main.class";
     private static final String BUKKIT_API = "org/bukkit/Bukkit.class";
     private static final String BUKKIT_VERSION_COMMAND = "org/bukkit/command/defaults/VersionCommand.class";
-    private static final String KIBBLE_VERSION = "0.1-dev";
+    private static final String KIBBLE_VERSION = "0.2-dev";
     /**
      * KillSwitch for compatibility patches
      * Can be disabled if your server doesn't require it
@@ -30,7 +30,7 @@ public class Main implements Opcodes {
 
     public static void main(String[] args) throws IOException {
         if (args.length != 2) {
-            System.err.println("Require <input> <output> !");
+            System.err.println("Usage: java -jar KibblePatcher.jar <input> <output>");
             System.exit(1);
             return;
         }
@@ -120,6 +120,7 @@ public class Main implements Opcodes {
             }
             // Specific optimisations
             ChunkCacheOptimizer.patch(srv, MathHelper, stats);
+            MethodResultCacheOptimizer.patch(srv, MathHelper, stats);
         }
         if (COMPATIBILITY_PATCHES) {
             inject.put("javax/xml/bind/DatatypeConverter.class", readResource("javax/xml/bind/DatatypeConverter.class"));
@@ -127,11 +128,14 @@ public class Main implements Opcodes {
         // Optimise all classes
         srv.values().removeIf(Objects::isNull); // Clean null elements
         if (!libraryMode) {
-            for (Map.Entry<String, byte[]> entry : srv.entrySet())
+            for (Map.Entry<String, byte[]> entry : srv.entrySet()) {
                 if (entry.getKey().endsWith(".class")) {
                     patchClassOpt(entry, classDataProvider, entry.getKey()
                             .startsWith("net/minecraft/server/") ? null : MathHelper, stats);
+                } else if (entry.getKey().startsWith("data/") && entry.getKey().endsWith(".json")) {
+                    trimJSON(entry);
                 }
+            }
             // Patch config for performances
             if (srv.get("configurations/bukkit.yml") != null) {
                 srv.put("configurations/bukkit.yml", new String(srv.get("configurations/bukkit.yml"), StandardCharsets.UTF_8)
@@ -369,8 +373,8 @@ public class Main implements Opcodes {
             @Override
             public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
                 super.visit(version, access, name, signature, superName, interfaces);
-                requireCalc_dontOptimise[1] = !(name.startsWith("net/minecraft/server/") || name.startsWith("org/spigotmc/") || (name.startsWith("org/bukkit/")
-                        && !name.startsWith("org/bukkit/craftbukkit/libs/")));
+                requireCalc_dontOptimise[1] = (version < V1_6 && !name.startsWith("net/minecraft/server/")
+                        && !(name.startsWith("org/bukkit/") && !name.startsWith("org/bukkit/craftbukkit/libs/")));
             }
 
             @Override
@@ -437,7 +441,50 @@ public class Main implements Opcodes {
         }
     }
 
+    public static void trimJSON(Map.Entry<String, byte[]> p) throws IOException {
+        byte[] bytes = p.getValue();
+        String str = new String(bytes, StandardCharsets.UTF_8);
+        StringBuilder stringBuilder = new StringBuilder();
+        int index = 0;
+        boolean inString = false, special = false;
+        while (index < str.length()) {
+            char next = str.charAt(index);
+            if (inString) {
+                if (special) {
+                    special = false;
+                } else if (next == '\\') {
+                    special = true;
+                } else if (next == '\"') {
+                    inString = false;
+                }
+            } else {
+                if (next == '\"') {
+                    inString = true;
+                }
+                switch (next) {
+                    default:
+                        break;
+                    case '\"':
+                        inString = true;
+                        break;
+                    case ' ':
+                    case '\n':
+                    case '\r':
+                    case '\t':
+                        index++;
+                        continue;
+                }
+            }
+            stringBuilder.append(next);
+            index++;
+        }
+        p.setValue(stringBuilder.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
     private static boolean inline0(MethodVisitor methodVisitor, int opcode, String owner, String name, String descriptor, boolean isInterface) {
+        if (!owner.equals("java/lang/Math") && !owner.equals("java/lang/StrictMath")) {
+            return false;
+        }
         if (descriptor.indexOf('I') != -1) {
             switch (name) {
                 default:
