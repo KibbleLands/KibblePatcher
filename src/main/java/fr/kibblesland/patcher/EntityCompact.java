@@ -3,7 +3,8 @@ package fr.kibblesland.patcher;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.tree.*;
+import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.MethodNode;
 
 import java.util.Map;
 
@@ -23,14 +24,7 @@ public class EntityCompact implements Opcodes {
         if (classNode.version < V1_8) { // For default in interface
             classNode.version = V1_8;
         }
-        MethodNode tmp;
-        classNode.methods.add(tmp = new MethodNode(ACC_PUBLIC|ACC_SYNTHETIC, "isZombie", "()Z", null, null));
-        LabelNode labelNode = new LabelNode();
-        tmp.instructions = new InsnList();
-        tmp.instructions.add(labelNode);
-        tmp.instructions.add(new LineNumberNode(12345, labelNode));
-        tmp.instructions.add(new InsnNode(ICONST_0));
-        tmp.instructions.add(new InsnNode(IRETURN));
+        ASMUtils.createStub(classNode, "isZombie", "()Z");
         ClassWriter classWriter = new ClassWriter(0);
         classNode.accept(classWriter);
         map.put(VILLAGER_PROFESSION, classWriter.toByteArray());

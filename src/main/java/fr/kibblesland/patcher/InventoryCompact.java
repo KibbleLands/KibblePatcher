@@ -17,25 +17,15 @@ public class InventoryCompact implements Opcodes {
         ClassReader classReader = new ClassReader(inv);
         ClassNode classNode = new ClassNode();
         classReader.accept(classNode, 0);
-        for (MethodNode methods: classNode.methods) {
-            if (methods.name.equals("getTitle")) {
-                return; // API already exists in this Spigot (Do nothing)
-            }
+        if (ASMUtils.hasMethod(classNode, "getTitle")) {
+            return; // API already exists in this Spigot (Do nothing)
         }
         if (classNode.version < V1_8) { // For default in interface
             classNode.version = V1_8;
         }
         MethodNode tmp;
-        classNode.methods.add(tmp = new MethodNode(ACC_PUBLIC|ACC_SYNTHETIC, "getName", "()Ljava/lang/String;", null, null));
-        LabelNode labelNode = new LabelNode();
-        tmp.instructions = new InsnList();
-        tmp.instructions.add(labelNode);
-        tmp.instructions.add(new LineNumberNode(12345, labelNode));
-        tmp.instructions.add(new VarInsnNode(ALOAD, 0));
-        tmp.instructions.add(new MethodInsnNode(INVOKEINTERFACE, "org/bukkit/inventory/Inventory", "getTitle", "()Ljava/lang/String;", true));
-        tmp.instructions.add(new InsnNode(ARETURN));
         classNode.methods.add(tmp = new MethodNode(ACC_PUBLIC|ACC_SYNTHETIC, "getTitle", "()Ljava/lang/String;", null, null));
-        labelNode = new LabelNode();
+        LabelNode labelNode = new LabelNode();
         tmp.instructions = new InsnList();
         tmp.instructions.add(labelNode);
         tmp.instructions.add(new LineNumberNode(12345, labelNode));
@@ -43,6 +33,7 @@ public class InventoryCompact implements Opcodes {
         tmp.instructions.add(new MethodInsnNode(INVOKEINTERFACE, "org/bukkit/inventory/Inventory", "getType", "()Lorg/bukkit/event/inventory/InventoryType;", true));
         tmp.instructions.add(new MethodInsnNode(INVOKEVIRTUAL, "org/bukkit/event/inventory/InventoryType", "getDefaultTitle", "()Ljava/lang/String;", false));
         tmp.instructions.add(new InsnNode(ARETURN));
+        ASMUtils.symlinkMethod(classNode, "getTitle", "getName");
         ClassWriter classWriter = new ClassWriter(0);
         classNode.accept(classWriter);
         map.put(INVENTORY, classWriter.toByteArray());

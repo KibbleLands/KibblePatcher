@@ -2,6 +2,7 @@ package fr.kibblesland.patcher;
 
 import fr.kibblesland.patcher.rebuild.ClassDataProvider;
 import org.objectweb.asm.*;
+import org.objectweb.asm.tree.MethodNode;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -21,7 +22,7 @@ public class Main implements Opcodes {
     private static final String CRAFT_BUKKIT_MAIN = "org/bukkit/craftbukkit/Main.class";
     private static final String BUKKIT_API = "org/bukkit/Bukkit.class";
     private static final String BUKKIT_VERSION_COMMAND = "org/bukkit/command/defaults/VersionCommand.class";
-    private static final String KIBBLE_VERSION = "0.2-dev";
+    private static final String KIBBLE_VERSION = "0.3-dev";
     /**
      * KillSwitch for compatibility patches
      * Can be disabled if your server doesn't require it
@@ -93,7 +94,7 @@ public class Main implements Opcodes {
         classDataProvider.addClasses(srv);
         System.gc(); // Clean memory
         System.out.println("Patching jar..."); //////////////////////////////////////////////////////////////
-        int[] stats = {0, 0, 0, 0, 0};
+        int[] stats = {0, 0, 0, 0, 0, 0};
         // Patch Manifest
         manifest.getMainAttributes().putValue("Kibble-Version", KIBBLE_VERSION);
         if (!libraryMode) {
@@ -117,6 +118,7 @@ public class Main implements Opcodes {
                 // Add commonly used APIs on old plugins
                 InventoryCompact.check(srv, MathHelper, stats);
                 EntityCompact.check(srv, MathHelper, stats);
+                PlayerPatcherCompact.check(srv, MathHelper, stats);
             }
             // Specific optimisations
             ChunkCacheOptimizer.patch(srv, MathHelper, stats);
@@ -170,10 +172,11 @@ public class Main implements Opcodes {
         System.out.println("Generic optimiser: ");
         System.out.println("  Inlined calls: "+stats[0]);
         System.out.println("  Optimised math calls: "+stats[1]);
-        System.out.println("  Direct access calls: "+stats[2]);
+        System.out.println("  Optimised opcodes: "+stats[2]);
         System.out.println("Server patcher: ");
         System.out.println("  Compatibility patches: "+stats[3]);
         System.out.println("  Optimisations patches: "+stats[4]);
+        System.out.println("  Security patches: "+stats[5]);
     }
 
     public static Map<String,byte[]> readZIP(final InputStream in) throws IOException {
@@ -380,7 +383,8 @@ public class Main implements Opcodes {
             @Override
             public MethodVisitor visitMethod(int access,final String m_name,final String m_descriptor, String signature, String[] exceptions) {
                 if (requireCalc_dontOptimise[1]) return new MethodVisitor(ASM8) {};
-                return new MethodVisitor(ASM8, super.visitMethod(access, m_name, m_descriptor, signature, exceptions)) {
+                final MethodVisitor parentMethodVisitor = super.visitMethod(access, m_name, m_descriptor, signature, exceptions);
+                return new MethodVisitor(ASM8, new MethodNode(access, m_name, m_descriptor, signature, exceptions)) {
                     @Override
                     public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
                         if (opcode == INVOKESTATIC && (owner.equals("java/lang/Math") || owner.equals("java/lang/StrictMath") || owner.equals("net/minecraft/util/Mth"))) {
@@ -396,7 +400,7 @@ public class Main implements Opcodes {
                                 }
                             } else if (owner.equals("java/lang/Math") && (name.equals("sqrt") || name.equals("sin") || name.equals("cos") || name.equals("asin") || name.equals("acos"))) {
                                 owner = "java/lang/StrictMath";
-                                stats[2]++;
+                                stats[1]++;
                             }
                             if (!inline0(this, opcode, owner, name, descriptor, isInterface)) {
                                 super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
@@ -407,6 +411,12 @@ public class Main implements Opcodes {
                             return;
                         }
                         super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
+                    }
+
+                    @Override
+                    public void visitEnd() {
+                        Optimizer.optimize(((MethodNode)this.mv), stats);
+                        ((MethodNode)this.mv).accept(parentMethodVisitor);
                     }
                 };
             }

@@ -15,8 +15,4 @@ public class KibbleOutputStream extends JarOutputStream {
         super.setLevel(9); // Max compression
         super.def.setStrategy(Deflater.NO_FLUSH);
     }
-
-    public Deflater getDeflater() {
-        return super.def;
-    }
 }
