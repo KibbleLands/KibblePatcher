@@ -22,7 +22,7 @@ public class Main implements Opcodes {
     private static final String CRAFT_BUKKIT_MAIN = "org/bukkit/craftbukkit/Main.class";
     private static final String BUKKIT_API = "org/bukkit/Bukkit.class";
     private static final String BUKKIT_VERSION_COMMAND = "org/bukkit/command/defaults/VersionCommand.class";
-    private static final String KIBBLE_VERSION = "0.3-dev";
+    private static final String KIBBLE_VERSION = "0.3.1-dev";
     /**
      * KillSwitch for compatibility patches
      * Can be disabled if your server doesn't require it

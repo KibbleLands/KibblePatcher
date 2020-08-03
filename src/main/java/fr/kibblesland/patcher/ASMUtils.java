@@ -91,7 +91,7 @@ public class ASMUtils implements Opcodes {
                 LabelNode labelNode = new LabelNode();
                 methodNodeSymlink.instructions.add(labelNode);
                 methodNodeSymlink.instructions.add(new LineNumberNode(12345, labelNode));
-                if (isStatic) {
+                if (!isStatic) {
                     methodNodeSymlink.instructions.add(new VarInsnNode(ALOAD, 0));
                 }
                 Type[] types = Type.getMethodType(methodNode.desc).getArgumentTypes();
