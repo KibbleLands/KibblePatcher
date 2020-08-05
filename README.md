@@ -2,6 +2,7 @@
 
 You can find downloads in [Releases](https://github.com/KibbleLands/KibblePatcher/releases)  
 Please read [LICENCE](https://github.com/Fox2Code/Repacker/blob/master/LICENSE) before using the software
+You can get support on our [Discord](https://discord.gg/bJ2uF8T)
 
 ## How to use
 
@@ -38,6 +39,3 @@ This patcher should support all Bukkit/Spigot/Paper but most of the optimisation
 If you think the patcher has an issue please try to launch your server with and without the patched jar 
 
 Snapshot version are not officially supported by the patcher but they should work
-
-## You want to support us join us on discord 
-https://discord.gg/bJ2uF8T
