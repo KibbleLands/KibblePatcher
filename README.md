@@ -1,7 +1,7 @@
 # KibblePatcher
 
 You can find downloads in [Releases](https://github.com/KibbleLands/KibblePatcher/releases)  
-Please read [LICENCE](https://github.com/Fox2Code/Repacker/blob/master/LICENSE) before using the software
+Please read [LICENCE](https://github.com/Fox2Code/Repacker/blob/master/LICENSE) before using the software  
 You can get support on our [Discord](https://discord.gg/bJ2uF8T)
 
 ## How to use
