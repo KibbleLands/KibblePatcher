@@ -1,7 +1,10 @@
 package fr.kibblesland.patcher;
 
+import fr.kibblesland.patcher.ext.ForEachRemover;
+import fr.kibblesland.patcher.patches.*;
 import fr.kibblesland.patcher.rebuild.ClassDataProvider;
 import org.objectweb.asm.*;
+import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
 import java.io.*;
@@ -22,12 +25,17 @@ public class Main implements Opcodes {
     private static final String CRAFT_BUKKIT_MAIN = "org/bukkit/craftbukkit/Main.class";
     private static final String BUKKIT_API = "org/bukkit/Bukkit.class";
     private static final String BUKKIT_VERSION_COMMAND = "org/bukkit/command/defaults/VersionCommand.class";
-    private static final String KIBBLE_VERSION = "0.3.1-dev";
+    private static final String KIBBLE_VERSION = "0.4-dev";
     /**
      * KillSwitch for compatibility patches
      * Can be disabled if your server doesn't require it
      */
     private static final boolean COMPATIBILITY_PATCHES = true;
+    /**
+     * KillSwitch for external patches
+     * Can be disabled to removes patch that fall under an unclear licence
+     */
+    private static final boolean EXTERNAL_PATCHES = true;
 
     public static void main(String[] args) throws IOException {
         if (args.length != 2) {
@@ -94,7 +102,7 @@ public class Main implements Opcodes {
         classDataProvider.addClasses(srv);
         System.gc(); // Clean memory
         System.out.println("Patching jar..."); //////////////////////////////////////////////////////////////
-        int[] stats = {0, 0, 0, 0, 0, 0};
+        int[] stats = {0, 0, 0, 0, 0, 0, 0};
         // Patch Manifest
         manifest.getMainAttributes().putValue("Kibble-Version", KIBBLE_VERSION);
         if (!libraryMode) {
@@ -123,6 +131,8 @@ public class Main implements Opcodes {
             // Specific optimisations
             ChunkCacheOptimizer.patch(srv, MathHelper, stats);
             MethodResultCacheOptimizer.patch(srv, MathHelper, stats);
+            BlockDataOptimiser.patch(srv, MathHelper, stats);
+            BookCrashFixer.patch(srv, MathHelper, stats);
         }
         if (COMPATIBILITY_PATCHES) {
             inject.put("javax/xml/bind/DatatypeConverter.class", readResource("javax/xml/bind/DatatypeConverter.class"));
@@ -173,6 +183,9 @@ public class Main implements Opcodes {
         System.out.println("  Inlined calls: "+stats[0]);
         System.out.println("  Optimised math calls: "+stats[1]);
         System.out.println("  Optimised opcodes: "+stats[2]);
+        if (EXTERNAL_PATCHES) {
+            System.out.println("  Optimised forEach: " + stats[6]);
+        }
         System.out.println("Server patcher: ");
         System.out.println("  Compatibility patches: "+stats[3]);
         System.out.println("  Optimisations patches: "+stats[4]);
@@ -371,8 +384,13 @@ public class Main implements Opcodes {
     private static void patchClassOpt(final Map.Entry<String, byte[]> p,ClassDataProvider cdp,String Math,final int[] stats,final boolean err) throws IOException {
         boolean[] requireCalc_dontOptimise = new boolean[]{false, false};
         ClassReader classReader = new ClassReader(p.getValue());
+        ClassNode classNode = new ClassNode();
+        classReader.accept(classNode, 0);
+        if (EXTERNAL_PATCHES) {
+            ForEachRemover.transform(classNode, cdp, stats);
+        }
         ClassWriter classWriter = err ? new ClassWriter(0) : cdp.newClassWriter();
-        classReader.accept(new ClassVisitor(ASM8, classWriter) {
+        classNode.accept(new ClassVisitor(ASM8, classWriter) {
             @Override
             public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
                 super.visit(version, access, name, signature, superName, interfaces);
@@ -420,7 +438,7 @@ public class Main implements Opcodes {
                     }
                 };
             }
-        }, 0);
+        });
         if (err) {
             Files.write(new File("malformed.class").toPath(), classWriter.toByteArray());
         } else {

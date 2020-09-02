@@ -5,6 +5,12 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
 
+import java.util.IdentityHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Predicate;
+
 public class ASMUtils implements Opcodes {
     public static boolean hasField(ClassNode classNode,String fieldName) {
         for (FieldNode fieldNode:classNode.fields) {
@@ -62,6 +68,37 @@ public class ASMUtils implements Opcodes {
                 && dynamicInsnNode.bsmArgs.length >= 2 && dynamicInsnNode.bsmArgs[1] instanceof Handle;
     }
 
+    public static LdcInsnNode findLdc(InsnList insnList,Object value) {
+        if (value == null) return null;
+        for (AbstractInsnNode insnNode:insnList) {
+            if (insnNode instanceof LdcInsnNode &&
+                    value.equals(((LdcInsnNode) insnNode).cst)) {
+                return (LdcInsnNode) insnNode;
+            }
+        }
+        return null;
+    }
+
+    public static InsnList copyInsnList(InsnList insnList) {
+        Map<LabelNode, LabelNode> map = new IdentityHashMap<LabelNode, LabelNode>() {
+            @Override
+            public LabelNode get(Object key) {
+                LabelNode labelNode = super.get(key);
+                return labelNode == null ? (LabelNode) key : labelNode;
+            }
+        };
+        for (AbstractInsnNode abstractInsnNode : insnList) {
+            if (abstractInsnNode instanceof LabelNode) {
+                map.put((LabelNode) abstractInsnNode, new LabelNode());
+            }
+        }
+        InsnList copy = new InsnList();
+        for (AbstractInsnNode abstractInsnNode : insnList) {
+            copy.add(abstractInsnNode.clone(map));
+        }
+        return copy;
+    }
+
     /**
      * @param methodNode The patched method
      * @param from Original instruction
@@ -85,7 +122,7 @@ public class ASMUtils implements Opcodes {
         boolean isInterface = (classNode.access & ACC_INTERFACE) != 0;
         for (MethodNode methodNode: classNode.methods.toArray(new MethodNode[0])) {
             if (methodNode.name.equals(target)) {
-                MethodNode methodNodeSymlink = new MethodNode(methodNode.access|ACC_SYNTHETIC&~ACC_ABSTRACT, link,
+                MethodNode methodNodeSymlink = new MethodNode((methodNode.access|ACC_SYNTHETIC)&(~ACC_ABSTRACT), link,
                         methodNode.desc, methodNode.signature, methodNode.exceptions.toArray(new String[0]));
                 boolean isStatic = (methodNode.access&ACC_STATIC) != 0;
                 LabelNode labelNode = new LabelNode();
@@ -156,5 +193,15 @@ public class ASMUtils implements Opcodes {
     public static boolean equals(AbstractInsnNode insn1,AbstractInsnNode insn2) {
         return insn1.getOpcode() == insn2.getOpcode()
                 && (!(insn1 instanceof IntInsnNode) || ((IntInsnNode) insn1).operand == ((IntInsnNode) insn2).operand);
+    }
+
+    public static List<AbstractInsnNode> findNodes(InsnList instructions, Predicate<AbstractInsnNode> check){
+        List<AbstractInsnNode> founds = new LinkedList<>();
+        for (AbstractInsnNode node : instructions) {
+            if(check.test(node)){
+                founds.add(node);
+            }
+        }
+        return founds;
     }
 }

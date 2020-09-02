@@ -1,5 +1,6 @@
-package fr.kibblesland.patcher;
+package fr.kibblesland.patcher.patches;
 
+import fr.kibblesland.patcher.ASMUtils;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.tree.ClassNode;
@@ -21,7 +22,7 @@ public class PlayerPatcherCompact {
         ASMUtils.symlinkMethod(classNode, "setItemInHand", "setItemInMainHand");
         ASMUtils.createStub(classNode, "getItemInOffHand", "()Lorg/bukkit/inventory/ItemStack;");
         ASMUtils.createStub(classNode, "setItemInOffHand", "(Lorg/bukkit/inventory/ItemStack;)V");
-        ClassWriter classWriter = new ClassWriter(0);
+        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         classNode.accept(classWriter);
         map.put(INVENTORY, classWriter.toByteArray());
         stats[3]++;

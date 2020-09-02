@@ -1,5 +1,6 @@
-package fr.kibblesland.patcher;
+package fr.kibblesland.patcher.patches;
 
+import fr.kibblesland.patcher.ASMUtils;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
