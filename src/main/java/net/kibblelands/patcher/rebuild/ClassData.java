@@ -1,4 +1,4 @@
-package fr.kibblesland.patcher.rebuild;
+package net.kibblelands.patcher.rebuild;
 
 public interface ClassData {
     String getName();

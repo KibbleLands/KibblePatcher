@@ -5,3 +5,6 @@ gradle-app.setting
 .gradletasknamecache
 .idea
 /out
+*.iml
+*.ipr
+*.iws

@@ -1,4 +1,4 @@
-package fr.kibblesland.patcher;
+package net.kibblelands.patcher;
 
 import java.util.*;
 

@@ -1,4 +1,4 @@
-package fr.kibblesland.patcher;
+package net.kibblelands.patcher;
 
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.AbstractInsnNode;

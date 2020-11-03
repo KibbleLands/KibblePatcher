@@ -6,7 +6,13 @@ import java.util.Base64;
  * Partial Implementation For Java9 support if {@code javax.xml.bind.DatatypeConverter} is missing
  */
 @Deprecated
+@SuppressWarnings("DeprecatedIsStillUsed")
 public final class DatatypeConverter {
+    @Deprecated
+    public static int parseInt(String string) {
+        return Integer.parseInt(string);
+    }
+
     @Deprecated
     public static byte[] parseBase64Binary(String string) {
         return Base64.getDecoder().decode(string);
@@ -21,6 +27,11 @@ public final class DatatypeConverter {
                     + Character.digit(string.charAt(i+1), 16));
         }
         return data;
+    }
+
+    @Deprecated
+    public static String printInt(int i) {
+        return Integer.toString(i);
     }
 
     @Deprecated

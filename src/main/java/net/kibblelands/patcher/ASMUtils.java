@@ -1,4 +1,4 @@
-package fr.kibblesland.patcher;
+package net.kibblelands.patcher;
 
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Opcodes;
@@ -12,6 +12,8 @@ import java.util.Map;
 import java.util.function.Predicate;
 
 public class ASMUtils implements Opcodes {
+    public static final int ASM_BUILD = ASM9;
+
     public static boolean hasField(ClassNode classNode,String fieldName) {
         for (FieldNode fieldNode:classNode.fields) {
             if (fieldNode.name.equals(fieldName)) {
@@ -24,6 +26,16 @@ public class ASMUtils implements Opcodes {
     public static boolean hasMethod(ClassNode classNode,String methodName) {
         for (MethodNode methodNode:classNode.methods) {
             if (methodNode.name.equals(methodName)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean hasMethod(ClassNode classNode,String methodName, String methodDesc) {
+        for (MethodNode methodNode:classNode.methods) {
+            if (methodNode.name.equals(methodName)
+                    && methodNode.desc.equals(methodDesc)) {
                 return true;
             }
         }

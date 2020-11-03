@@ -1,4 +1,4 @@
-package fr.kibblesland.patcher.patches;
+package net.kibblelands.patcher.patches;
 
 import org.objectweb.asm.*;
 import org.objectweb.asm.tree.ClassNode;
@@ -6,6 +6,8 @@ import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
 
 import java.util.Map;
+
+import static net.kibblelands.patcher.ASMUtils.ASM_BUILD;
 
 public class BlockDataOptimiser implements Opcodes {
     private static final String NMS_BLOCK      = "net/minecraft/server/$NMS/Block";
@@ -73,10 +75,10 @@ public class BlockDataOptimiser implements Opcodes {
                 final MethodNode finalGetter = getter;
                 final MethodNode finalSetter = setter;
                 final FieldNode finalValue = value;
-                new ClassReader(entry.getValue()).accept(new ClassVisitor(ASM8, classWriter) {
+                new ClassReader(entry.getValue()).accept(new ClassVisitor(ASM_BUILD, classWriter) {
                     @Override
                     public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
-                        return new MethodVisitor(ASM8, super.visitMethod(access, name, descriptor, signature, exceptions)) {
+                        return new MethodVisitor(ASM_BUILD, super.visitMethod(access, name, descriptor, signature, exceptions)) {
                             @Override
                             public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
                                 if (opcode == INVOKEVIRTUAL && owner.equals(BLOCK)) {

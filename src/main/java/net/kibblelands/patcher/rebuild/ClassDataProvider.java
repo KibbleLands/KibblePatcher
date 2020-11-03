@@ -1,4 +1,4 @@
-package fr.kibblesland.patcher.rebuild;
+package net.kibblelands.patcher.rebuild;
 
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
@@ -9,8 +9,8 @@ import java.lang.reflect.Type;
 import java.security.SecureClassLoader;
 import java.util.*;
 
+import static net.kibblelands.patcher.ASMUtils.ASM_BUILD;
 import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
-import static org.objectweb.asm.Opcodes.ASM6;
 
 public class ClassDataProvider {
     private static final ClassLoader BOOTSTRAP_CLASS_LOADER = new SecureClassLoader(null) {};
@@ -217,7 +217,7 @@ public class ClassDataProvider {
         try {
             ClassReader classReader = new ClassReader(Objects.requireNonNull(this.classLoader.getResourceAsStream(clName + ".class")));
             final ClData2 tClData = (ClData2) clData;
-            classReader.accept(new ClassVisitor(ASM6) {
+            classReader.accept(new ClassVisitor(ASM_BUILD) {
                 @Override
                 public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
                     tClData.access = access;
@@ -293,7 +293,7 @@ public class ClassDataProvider {
             ClData2 clData = new ClData2(name);
             try {
                 ClassReader classReader = new ClassReader(entry.getValue());
-                classReader.accept(new ClassVisitor(ASM6) {
+                classReader.accept(new ClassVisitor(ASM_BUILD) {
                     @Override
                     public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
                         clData.access = access;

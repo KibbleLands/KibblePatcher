@@ -1,11 +1,10 @@
-package fr.kibblesland.patcher;
+package net.kibblelands.patcher;
 
-import fr.kibblesland.patcher.ext.ForEachRemover;
-import fr.kibblesland.patcher.patches.*;
-import fr.kibblesland.patcher.rebuild.ClassDataProvider;
+import net.kibblelands.patcher.ext.ForEachRemover;
+import net.kibblelands.patcher.patches.*;
+import net.kibblelands.patcher.rebuild.ClassDataProvider;
 import org.objectweb.asm.*;
-import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.*;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -21,11 +20,13 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
+import static net.kibblelands.patcher.ASMUtils.ASM_BUILD;
+
 public class Main implements Opcodes {
     private static final String CRAFT_BUKKIT_MAIN = "org/bukkit/craftbukkit/Main.class";
     private static final String BUKKIT_API = "org/bukkit/Bukkit.class";
     private static final String BUKKIT_VERSION_COMMAND = "org/bukkit/command/defaults/VersionCommand.class";
-    private static final String KIBBLE_VERSION = "0.4-dev";
+    private static final String KIBBLE_VERSION = "0.5-dev";
     /**
      * KillSwitch for compatibility patches
      * Can be disabled if your server doesn't require it
@@ -39,16 +40,22 @@ public class Main implements Opcodes {
 
     public static void main(String[] args) throws IOException {
         if (args.length != 2) {
-            System.err.println("Usage: java -jar KibblePatcher.jar <input> <output>");
+            System.err.print("Usage: \n" +
+                    "    java -jar KibblePatcher.jar <input> <output>\n" +
+                    "    java -jar KibblePatcher.jar -patch <file>\n");
             System.exit(1);
             return;
         }
-        File in = new File(args[0]);
+        File in = new File(args[args[0].equals("-patch") ? 1 : 0]);
         if (!in.exists()) {
             System.err.println("Input doesn't exists!");
             System.exit(2);
             return;
         }
+        patchServerJar(in, new File(args[1]));
+    }
+
+    public static void patchServerJar(File in, File out) throws IOException {
         System.out.println("Reading jar..."); //////////////////////////////////////////////////////////////
         byte[] origBytes = Files.readAllBytes(in.toPath());
         boolean javaZipMitigation = false;
@@ -98,7 +105,7 @@ public class Main implements Opcodes {
             return;
         }
         String NMS = libraryMode ? null : MathHelper.substring(21, MathHelper.lastIndexOf('/'));
-        ClassDataProvider classDataProvider = new ClassDataProvider();
+        ClassDataProvider classDataProvider = new ClassDataProvider(Main.class.getClassLoader());
         classDataProvider.addClasses(srv);
         System.gc(); // Clean memory
         System.out.println("Patching jar..."); //////////////////////////////////////////////////////////////
@@ -124,6 +131,7 @@ public class Main implements Opcodes {
             srv.put(NMS_DEDICATED_SERVER, patchGC(srv.get(NMS_DEDICATED_SERVER), "init", stats));
             if (COMPATIBILITY_PATCHES) {
                 // Add commonly used APIs on old plugins
+                OnlinePlayersCompact.check(srv, MathHelper, stats);
                 InventoryCompact.check(srv, MathHelper, stats);
                 EntityCompact.check(srv, MathHelper, stats);
                 PlayerPatcherCompact.check(srv, MathHelper, stats);
@@ -134,9 +142,44 @@ public class Main implements Opcodes {
             BlockDataOptimiser.patch(srv, MathHelper, stats);
             BookCrashFixer.patch(srv, MathHelper, stats);
         }
-        if (COMPATIBILITY_PATCHES) {
-            inject.put("javax/xml/bind/DatatypeConverter.class", readResource("javax/xml/bind/DatatypeConverter.class"));
+        if (COMPATIBILITY_PATCHES && !inject.containsKey("javax/xml/bind/DatatypeConverter.class")) {
+            // These classes are used by some plugins but no longer available since java 9
+            inject.put("javax/xml/bind/DatatypeConverter.class",
+                    readResource("javax/xml/bind/DatatypeConverter.class"));
+            inject.put("javax/xml/bind/annotation/adapters/XmlAdapter.class",
+                    readResource("javax/xml/bind/annotation/adapters/XmlAdapter.class"));
+            inject.put("javax/xml/bind/annotation/adapters/HexBinaryAdapter.class",
+                    readResource("javax/xml/bind/annotation/adapters/HexBinaryAdapter.class"));
         }
+        byte[] FastMathAPI = readResource("net/kibblelands/server/FastMath.class");
+        if (!libraryMode) { // Mirror FastMath to MathHelper
+            ClassNode classNode = new ClassNode();
+            new ClassReader(FastMathAPI).accept(classNode, 0);
+            for (MethodNode methodNode:classNode.methods) {
+                if (!methodNode.name.startsWith("<")) {
+                    methodNode.instructions.clear();
+                    boolean d2f = methodNode.desc.indexOf('D') != -1;
+                    if (d2f) {
+                        methodNode.instructions.add(new VarInsnNode(DLOAD, 0));
+                        methodNode.instructions.add(new InsnNode(D2F));
+                    } else {
+                        methodNode.instructions.add(new VarInsnNode(FLOAD, 0));
+                    }
+                    methodNode.instructions.add(new MethodInsnNode(INVOKESTATIC,
+                            MathHelper, methodNode.name, "(F)F", false));
+                    if (d2f) {
+                        methodNode.instructions.add(new InsnNode(F2D));
+                        methodNode.instructions.add(new InsnNode(DRETURN));
+                    } else {
+                        methodNode.instructions.add(new InsnNode(FRETURN));
+                    }
+                }
+            }
+            ClassWriter classWriter = classDataProvider.newClassWriter();
+            classNode.accept(classWriter);
+            FastMathAPI = classWriter.toByteArray();
+        }
+        inject.put("net/kibblelands/server/FastMath.class", FastMathAPI);
         // Optimise all classes
         srv.values().removeIf(Objects::isNull); // Clean null elements
         if (!libraryMode) {
@@ -174,7 +217,7 @@ public class Main implements Opcodes {
         }
         System.gc(); // Clean memory
         System.out.println("Writing jar..."); //////////////////////////////////////////////////////////////
-        FileOutputStream fileOutputStream = new FileOutputStream(new File(args[1]));
+        FileOutputStream fileOutputStream = new FileOutputStream(out);
         fileOutputStream.write(origBytes);
         fileOutputStream.flush();
         fileOutputStream.close();
@@ -275,10 +318,10 @@ public class Main implements Opcodes {
     public static byte[] patchDelayer(byte[] bytes) throws IOException {
         ClassReader classReader = new ClassReader(bytes);
         ClassWriter classWriter = new ClassWriter(0);
-        classReader.accept(new ClassVisitor(ASM8, classWriter) {
+        classReader.accept(new ClassVisitor(ASM_BUILD, classWriter) {
             @Override
             public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
-                return new MethodVisitor(ASM8, super.visitMethod(access, name, descriptor, signature, exceptions)) {
+                return new MethodVisitor(ASM_BUILD, super.visitMethod(access, name, descriptor, signature, exceptions)) {
                     boolean patch20 = false;
 
                     @Override
@@ -306,13 +349,13 @@ public class Main implements Opcodes {
         if (bytes == null) return null;
         ClassReader classReader = new ClassReader(bytes);
         ClassWriter classWriter = new ClassWriter(0);
-        classReader.accept(new ClassVisitor(ASM8, classWriter) {
+        classReader.accept(new ClassVisitor(ASM_BUILD, classWriter) {
             @Override
             public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
                 if (!name.equals("getServerModName")) {
                     return super.visitMethod(access, name, descriptor, signature, exceptions);
                 }
-                return new MethodVisitor(ASM8, super.visitMethod(access, name, descriptor, signature, exceptions)) {
+                return new MethodVisitor(ASM_BUILD, super.visitMethod(access, name, descriptor, signature, exceptions)) {
                     @Override
                     public void visitLdcInsn(Object value) {
                         if (value instanceof String) {
@@ -333,10 +376,10 @@ public class Main implements Opcodes {
         if (bytes == null) return null;
         ClassReader classReader = new ClassReader(bytes);
         ClassWriter classWriter = new ClassWriter(0);
-        classReader.accept(new ClassVisitor(ASM8, classWriter) {
+        classReader.accept(new ClassVisitor(ASM_BUILD, classWriter) {
             @Override
             public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
-                return new MethodVisitor(ASM8, super.visitMethod(access, name, descriptor, signature, exceptions)) {
+                return new MethodVisitor(ASM_BUILD, super.visitMethod(access, name, descriptor, signature, exceptions)) {
                     @Override
                     public void visitLdcInsn(Object value) {
                         if (value instanceof String) {
@@ -356,13 +399,13 @@ public class Main implements Opcodes {
         if (bytes == null) return null;
         ClassReader classReader = new ClassReader(bytes);
         ClassWriter classWriter = new ClassWriter(0);
-        classReader.accept(new ClassVisitor(ASM8, classWriter) {
+        classReader.accept(new ClassVisitor(ASM_BUILD, classWriter) {
             @Override
             public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
                 if (!name.equals(method)) {
                     return super.visitMethod(access, name, descriptor, signature, exceptions);
                 }
-                return new MethodVisitor(ASM8, super.visitMethod(access, name, descriptor, signature, exceptions)) {
+                return new MethodVisitor(ASM_BUILD, super.visitMethod(access, name, descriptor, signature, exceptions)) {
                     @Override
                     public void visitInsn(int opcode) {
                         if (opcode == RETURN || opcode == IRETURN) {
@@ -390,7 +433,7 @@ public class Main implements Opcodes {
             ForEachRemover.transform(classNode, cdp, stats);
         }
         ClassWriter classWriter = err ? new ClassWriter(0) : cdp.newClassWriter();
-        classNode.accept(new ClassVisitor(ASM8, classWriter) {
+        classNode.accept(new ClassVisitor(ASM_BUILD, classWriter) {
             @Override
             public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
                 super.visit(version, access, name, signature, superName, interfaces);
@@ -400,9 +443,9 @@ public class Main implements Opcodes {
 
             @Override
             public MethodVisitor visitMethod(int access,final String m_name,final String m_descriptor, String signature, String[] exceptions) {
-                if (requireCalc_dontOptimise[1]) return new MethodVisitor(ASM8) {};
+                if (requireCalc_dontOptimise[1]) return new MethodVisitor(ASM_BUILD) {};
                 final MethodVisitor parentMethodVisitor = super.visitMethod(access, m_name, m_descriptor, signature, exceptions);
-                return new MethodVisitor(ASM8, new MethodNode(access, m_name, m_descriptor, signature, exceptions)) {
+                return new MethodVisitor(ASM_BUILD, new MethodNode(access, m_name, m_descriptor, signature, exceptions)) {
                     @Override
                     public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
                         if (opcode == INVOKESTATIC && (owner.equals("java/lang/Math") || owner.equals("java/lang/StrictMath") || owner.equals("net/minecraft/util/Mth"))) {
@@ -447,10 +490,10 @@ public class Main implements Opcodes {
             }
             byte[] data = classWriter.toByteArray();
             classWriter = requireCalc_dontOptimise[0] ? cdp.newClassWriter() : new ClassWriter(ClassWriter.COMPUTE_MAXS);
-            new ClassReader(data).accept(new ClassVisitor(ASM8, classWriter) {
+            new ClassReader(data).accept(new ClassVisitor(ASM_BUILD, classWriter) {
                 @Override
                 public MethodVisitor visitMethod(int access, String m_name, String m_descriptor, String signature, String[] exceptions) {
-                    return new MethodVisitor(ASM8, super.visitMethod(access, m_name, m_descriptor, signature, exceptions)) {
+                    return new MethodVisitor(ASM_BUILD, super.visitMethod(access, m_name, m_descriptor, signature, exceptions)) {
                         @Override
                         public void visitMaxs(int maxStack, int maxLocals) {
                             try {

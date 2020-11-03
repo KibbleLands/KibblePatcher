@@ -5,7 +5,7 @@ plugins {
 }
 
 group 'org.example'
-version '0.4-dev'
+version '0.5-dev'
 
 repositories {
     mavenCentral()
@@ -17,7 +17,7 @@ configurations {
 
 jar {
     manifest {
-        attributes 'Main-Class': 'fr.kibblesland.patcher.Main'
+        attributes 'Main-Class': 'net.kibblelands.patcher.Main'
     }
     from {
         configurations.shadow.collect { it.isDirectory() ? it : zipTree(it) }
@@ -27,8 +27,8 @@ jar {
 
 dependencies {
     testCompile group: 'junit', name: 'junit', version: '4.12'
-    implementation 'org.ow2.asm:asm-commons:8.0.1'
-    shadow 'org.ow2.asm:asm-commons:8.0.1'
+    implementation 'org.ow2.asm:asm-commons:9.0'
+    shadow 'org.ow2.asm:asm-commons:9.0'
 }
 /*
 jar.enabled = false

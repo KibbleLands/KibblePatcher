@@ -4,10 +4,10 @@ From:
   https://github.com/gudenau/minecraft-gudfps
  */
 
-package fr.kibblesland.patcher.ext;
+package net.kibblelands.patcher.ext;
 
-import fr.kibblesland.patcher.ASMUtils;
-import fr.kibblesland.patcher.rebuild.ClassDataProvider;
+import net.kibblelands.patcher.ASMUtils;
+import net.kibblelands.patcher.rebuild.ClassDataProvider;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
