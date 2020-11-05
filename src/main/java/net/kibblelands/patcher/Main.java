@@ -26,7 +26,7 @@ public class Main implements Opcodes {
     private static final String CRAFT_BUKKIT_MAIN = "org/bukkit/craftbukkit/Main.class";
     private static final String BUKKIT_API = "org/bukkit/Bukkit.class";
     private static final String BUKKIT_VERSION_COMMAND = "org/bukkit/command/defaults/VersionCommand.class";
-    private static final String KIBBLE_VERSION = "0.5-dev";
+    private static final String KIBBLE_VERSION = "0.6-dev";
     /**
      * KillSwitch for compatibility patches
      * Can be disabled if your server doesn't require it
@@ -81,6 +81,14 @@ public class Main implements Opcodes {
             System.exit(4);
             return;
         }
+        String StringUtil = null;
+        if (srv.containsKey("org/apache/commons/lang/StringUtils.class")) {
+            StringUtil = "org/apache/commons/lang/StringUtils";
+        } else if (srv.containsKey("org/apache/commons/lang3/StringUtils.class")) {
+            StringUtil = "org/apache/commons/lang3/StringUtils";
+        } else if (srv.containsKey("org/bukkit/craftbukkit/libs/org/apache/commons/lang3/StringUtils.class")) {
+            StringUtil = "org/bukkit/craftbukkit/libs/org/apache/commons/lang3/StringUtils";
+        }
         String MathHelper = null;
         for (String entry:srv.keySet()) {
             if (entry.startsWith("net/minecraft/server/") && entry.endsWith("/MathHelper.class")) {
@@ -112,6 +120,7 @@ public class Main implements Opcodes {
         int[] stats = {0, 0, 0, 0, 0, 0, 0};
         // Patch Manifest
         manifest.getMainAttributes().putValue("Kibble-Version", KIBBLE_VERSION);
+        final boolean[] plRewrite = new boolean[]{false};
         if (!libraryMode) {
             if (manifest.getAttributes("net/minecraft/server/") == null) {
                 Attributes attributes = new Attributes();
@@ -135,12 +144,17 @@ public class Main implements Opcodes {
                 InventoryCompact.check(srv, MathHelper, stats);
                 EntityCompact.check(srv, MathHelper, stats);
                 PlayerPatcherCompact.check(srv, MathHelper, stats);
+                GuavaVarTypeCompact.check(srv, MathHelper, stats);
             }
             // Specific optimisations
             ChunkCacheOptimizer.patch(srv, MathHelper, stats);
             MethodResultCacheOptimizer.patch(srv, MathHelper, stats);
             BlockDataOptimiser.patch(srv, MathHelper, stats);
             BookCrashFixer.patch(srv, MathHelper, stats);
+            PluginRewriteOptimiser.patch(srv, MathHelper, plRewrite);
+            // Save in the jar if plugin rewrite is supported/installed
+            manifest.getMainAttributes().putValue(
+                    "Kibble-Rewrite", plRewrite[0]?"INSTALLED":"UNSUPPORTED");
         }
         if (COMPATIBILITY_PATCHES && !inject.containsKey("javax/xml/bind/DatatypeConverter.class")) {
             // These classes are used by some plugins but no longer available since java 9
@@ -152,6 +166,7 @@ public class Main implements Opcodes {
                     readResource("javax/xml/bind/annotation/adapters/HexBinaryAdapter.class"));
         }
         byte[] FastMathAPI = readResource("net/kibblelands/server/FastMath.class");
+        byte[] FastReplaceAPI = readResource("net/kibblelands/server/FastReplace.class");
         if (!libraryMode) { // Mirror FastMath to MathHelper
             ClassNode classNode = new ClassNode();
             new ClassReader(FastMathAPI).accept(classNode, 0);
@@ -178,8 +193,39 @@ public class Main implements Opcodes {
             ClassWriter classWriter = classDataProvider.newClassWriter();
             classNode.accept(classWriter);
             FastMathAPI = classWriter.toByteArray();
+            if (StringUtil != null) {
+                classNode = new ClassNode();
+                new ClassReader(FastReplaceAPI).accept(classNode, 0);
+                for (MethodNode methodNode:classNode.methods) {
+                    if (!methodNode.name.startsWith("<")) {
+                        if (methodNode.desc.contains("CharSequence")) {
+                            for (AbstractInsnNode insnNode:methodNode.instructions) {
+                                if (insnNode.getOpcode() == INVOKESTATIC) {
+                                    MethodInsnNode methodInsnNode = (MethodInsnNode) insnNode;
+                                    if (methodInsnNode.name.equals("replace")) {
+                                        methodInsnNode.owner = StringUtil;
+                                        break;
+                                    }
+                                }
+                            }
+                        } else {
+                            methodNode.instructions.clear();
+                            methodNode.instructions.add(new VarInsnNode(ALOAD, 0));
+                            methodNode.instructions.add(new VarInsnNode(ALOAD, 1));
+                            methodNode.instructions.add(new VarInsnNode(ALOAD, 2));
+                            methodNode.instructions.add(new MethodInsnNode(INVOKESTATIC,
+                                    StringUtil, "replace", methodNode.desc, false));
+                            methodNode.instructions.add(new InsnNode(ARETURN));
+                        }
+                    }
+                }
+                classWriter = classDataProvider.newClassWriter();
+                classNode.accept(classWriter);
+                FastReplaceAPI = classWriter.toByteArray();
+            }
         }
         inject.put("net/kibblelands/server/FastMath.class", FastMathAPI);
+        inject.put("net/kibblelands/server/FastReplace.class", FastReplaceAPI);
         // Optimise all classes
         srv.values().removeIf(Objects::isNull); // Clean null elements
         if (!libraryMode) {
@@ -187,11 +233,11 @@ public class Main implements Opcodes {
                 if (entry.getKey().endsWith(".class")) {
                     patchClassOpt(entry, classDataProvider, entry.getKey()
                             .startsWith("net/minecraft/server/") ? null : MathHelper, stats);
-                } else if (entry.getKey().startsWith("data/") && entry.getKey().endsWith(".json")) {
+                } else if (entry.getKey().equals("pack.mcmeta") || entry.getKey().endsWith(".json")) {
                     trimJSON(entry);
                 }
             }
-            // Patch config for performances
+            // Patch default config for performance
             if (srv.get("configurations/bukkit.yml") != null) {
                 srv.put("configurations/bukkit.yml", new String(srv.get("configurations/bukkit.yml"), StandardCharsets.UTF_8)
                         .replace("query-plugins: true", "query-plugins: false")
@@ -224,7 +270,7 @@ public class Main implements Opcodes {
         System.out.println("Finished!");
         System.out.println("Generic optimiser: ");
         System.out.println("  Inlined calls: "+stats[0]);
-        System.out.println("  Optimised math calls: "+stats[1]);
+        System.out.println("  Optimised java calls: "+stats[1]);
         System.out.println("  Optimised opcodes: "+stats[2]);
         if (EXTERNAL_PATCHES) {
             System.out.println("  Optimised forEach: " + stats[6]);
@@ -233,6 +279,7 @@ public class Main implements Opcodes {
         System.out.println("  Compatibility patches: "+stats[3]);
         System.out.println("  Optimisations patches: "+stats[4]);
         System.out.println("  Security patches: "+stats[5]);
+        System.out.println("  Plugin rewrite: "+(plRewrite[0]?"INSTALLED":"UNSUPPORTED"));
     }
 
     public static Map<String,byte[]> readZIP(final InputStream in) throws IOException {
@@ -424,6 +471,9 @@ public class Main implements Opcodes {
         patchClassOpt(p, cdp, Math, stats, false);
     }
 
+    private static final String replaceDesc =
+            "(Ljava/lang/String;Ljava/lang/CharSequence;Ljava/lang/CharSequence;)Ljava/lang/String;";
+
     private static void patchClassOpt(final Map.Entry<String, byte[]> p,ClassDataProvider cdp,String Math,final int[] stats,final boolean err) throws IOException {
         boolean[] requireCalc_dontOptimise = new boolean[]{false, false};
         ClassReader classReader = new ClassReader(p.getValue());
@@ -470,6 +520,12 @@ public class Main implements Opcodes {
                                 requireCalc_dontOptimise[0] = true;
                             }
                             return;
+                        } else if (opcode == INVOKEVIRTUAL && owner.equals("java/lang/String") &&
+                                name.equals("replace") && descriptor.contains("CharSequence")) {
+                            opcode = INVOKESTATIC;
+                            owner = "net/kibblelands/server/FastReplace";
+                            descriptor = replaceDesc;
+                            stats[1]++;
                         }
                         super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
                     }

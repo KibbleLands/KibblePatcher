@@ -20,13 +20,18 @@ Optimise server bytecode and use faster Math calls for bukkit APIs resulting in 
 
 Server specific patches also help your server run better even without plugins
 
+Redirect some java API to the optimised ones  
+Redirect also on loaded plugins if the server support `plugin rewrite`
+
 ### Plugin Backward Compatibility
 
 Add back commonly used APIs by old plugins to ensure maximum compatibility with all your plugins
 
+You can take a look at [fixed plugins list](#fixed-plugins-list)
+
 ### Server zip compression
 
-Reduce ZIP size by compressing better files and removing unnecessary bytes
+Reduce ZIP size by better compressing files, removing unnecessary files, and trimming json
 
 ### Reduce outdated time delay
 
@@ -36,6 +41,21 @@ Change the wait time from `20` seconds to `5` seconds when the server detects th
 
 This patcher should support all Bukkit/Spigot/Paper but most of the optimisations in this patcher target the latest versions of minecraft
 
+The `plugin rewrite` functionality require at least **MC 1.13+**
+
 If you think the patcher has an issue please try to launch your server with and without the patched jar 
 
-Snapshot version are not officially supported by the patcher but they should work
+The patcher do not officially support snapshots they should work
+
+Hybrids server (Forge + Bukkit) are not supported and won't work with the patcher
+
+## Fixed Plugins list
+
+This is an incomplete list of plugins not working on the
+latest version of spigot that KibblePatcher fix completely or partially
+
+You can also submit your test result by opening an issue
+
+[Essential](https://dev.bukkit.org/projects/essentials): 
+Launch, but some commands does not work  
+

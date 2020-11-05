@@ -49,7 +49,7 @@ public class OnlinePlayersCompact implements Opcodes {
             classNode.version = V1_8;
         }
         int access = (isStatic ? ACC_STATIC : 0) | ACC_PUBLIC | ACC_SYNTHETIC | ACC_BRIDGE;
-        int invoke = isStatic ? INVOKESTATIC : INVOKEVIRTUAL;
+        int invoke = isStatic ? INVOKESTATIC : INVOKEINTERFACE;
         if (!ASMUtils.hasMethod(classNode, GET_ONLINE_PLAYERS, DESC_LEGACY)) {
             MethodNode getOnlinePlayers = new MethodNode(
                     access, GET_ONLINE_PLAYERS, DESC_LEGACY, null, null);
@@ -58,10 +58,10 @@ public class OnlinePlayersCompact implements Opcodes {
             }
             getOnlinePlayers.instructions.add(new MethodInsnNode(invoke, self, GET_ONLINE_PLAYERS, DESC_NEW));
             getOnlinePlayers.instructions.add(new InsnNode(ICONST_0));
-            getOnlinePlayers.instructions.add(new TypeInsnNode(ANEWARRAY, "java/lang/String"));
+            getOnlinePlayers.instructions.add(new TypeInsnNode(ANEWARRAY, "org/bukkit/entity/Player"));
             getOnlinePlayers.instructions.add(new MethodInsnNode(
                     INVOKEINTERFACE, "java/util/Collection", "toArray", "([Ljava/lang/Object;)[Ljava/lang/Object;", true));
-            getOnlinePlayers.instructions.add(new TypeInsnNode(CHECKCAST, "[Ljava/lang/String;"));
+            getOnlinePlayers.instructions.add(new TypeInsnNode(CHECKCAST, "[Lorg/bukkit/entity/Player;"));
             getOnlinePlayers.instructions.add(new InsnNode(ARETURN));
             classNode.methods.add(getOnlinePlayers);
             return true;

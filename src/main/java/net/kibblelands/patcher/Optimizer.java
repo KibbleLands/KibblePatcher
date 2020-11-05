@@ -43,7 +43,20 @@ public class Optimizer implements Opcodes {
                             stats[2]++;
                             break;
                     }
+                    break;
                 }
+                case F2D:
+                    if (previous.getOpcode() == D2F) {
+                        methodNode.instructions.remove(previous);
+                        methodNode.instructions.remove(insnNode);
+                    }
+                    break;
+                case D2F:
+                    if (previous.getOpcode() == F2D) {
+                        methodNode.instructions.remove(previous);
+                        methodNode.instructions.remove(insnNode);
+                    }
+                    break;
             }
         }
     }

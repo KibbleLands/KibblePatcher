@@ -24,22 +24,25 @@ public class ASMUtils implements Opcodes {
     }
 
     public static boolean hasMethod(ClassNode classNode,String methodName) {
-        for (MethodNode methodNode:classNode.methods) {
-            if (methodNode.name.equals(methodName)) {
-                return true;
-            }
-        }
-        return false;
+        return findMethod(classNode, methodName) != null;
     }
 
     public static boolean hasMethod(ClassNode classNode,String methodName, String methodDesc) {
+        return findMethod(classNode, methodName, methodDesc) != null;
+    }
+
+    public static MethodNode findMethod(ClassNode classNode,String methodName) {
+        return findMethod(classNode, methodName, null);
+    }
+
+    public static MethodNode findMethod(ClassNode classNode,String methodName, String methodDesc) {
         for (MethodNode methodNode:classNode.methods) {
             if (methodNode.name.equals(methodName)
-                    && methodNode.desc.equals(methodDesc)) {
-                return true;
+                    && (methodDesc == null || methodNode.desc.equals(methodDesc))) {
+                return methodNode;
             }
         }
-        return false;
+        return null;
     }
 
     public static MethodNode findMethodByDesc(ClassNode classNode,String descriptor) {
@@ -215,5 +218,16 @@ public class ASMUtils implements Opcodes {
             }
         }
         return founds;
+    }
+
+    public static AbstractInsnNode getNumberInsn(int number) {
+        if (number >= -1 && number <= 5)
+            return new InsnNode(number + 3);
+        else if (number >= -128 && number <= 127)
+            return new IntInsnNode(Opcodes.BIPUSH, number);
+        else if (number >= -32768 && number <= 32767)
+            return new IntInsnNode(Opcodes.SIPUSH, number);
+        else
+            return new LdcInsnNode(number);
     }
 }

@@ -1,5 +1,9 @@
 package net.kibblelands.server;
 
+/**
+ * This class is edited automatically by the patcher
+ * to use the Minecraft implementation of sin and cos
+ */
 public class FastMath {
     private FastMath() {}
 
