@@ -37,6 +37,13 @@ Reduce ZIP size by better compressing files, removing unnecessary files, and tri
 
 Change the wait time from `20` seconds to `5` seconds when the server detects that the build is outdated
 
+### Unique Server APIs to gain performances
+
+Help developers to implement features in more efficient and simple
+ways that can't be achieved without server modification
+
+See [Developers APIs Docs](docs/README.md) if you are interested
+
 ## Patcher Compatibility
 
 This patcher should support all Bukkit/Spigot/Paper but most of the optimisations in this patcher target the latest versions of minecraft
@@ -49,7 +56,7 @@ The patcher do not officially support snapshots they should work
 
 Hybrids server (Forge + Bukkit) are not supported and won't work with the patcher
 
-## Fixed Plugins list
+## Backported Plugins list
 
 This is an incomplete list of plugins not working on the
 latest version of spigot that KibblePatcher fix completely or partially

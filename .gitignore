@@ -8,3 +8,5 @@ gradle-app.setting
 *.iml
 *.ipr
 *.iws
+# Don't push private testing
+/src/test/java/priv/

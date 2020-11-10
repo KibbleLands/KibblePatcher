@@ -26,7 +26,7 @@ public class Main implements Opcodes {
     private static final String CRAFT_BUKKIT_MAIN = "org/bukkit/craftbukkit/Main.class";
     private static final String BUKKIT_API = "org/bukkit/Bukkit.class";
     private static final String BUKKIT_VERSION_COMMAND = "org/bukkit/command/defaults/VersionCommand.class";
-    private static final String KIBBLE_VERSION = "0.6-dev";
+    private static final String KIBBLE_VERSION = "0.7-dev";
     /**
      * KillSwitch for compatibility patches
      * Can be disabled if your server doesn't require it
@@ -37,6 +37,11 @@ public class Main implements Opcodes {
      * Can be disabled to removes patch that fall under an unclear licence
      */
     private static final boolean EXTERNAL_PATCHES = true;
+    /**
+     * KillSwitch for features patches
+     * Can be disabled if your server doesn't require it
+     */
+    private static final boolean FEATURES_PATCHES = true;
 
     public static void main(String[] args) throws IOException {
         if (args.length != 2) {
@@ -152,9 +157,19 @@ public class Main implements Opcodes {
             BlockDataOptimiser.patch(srv, MathHelper, stats);
             BookCrashFixer.patch(srv, MathHelper, stats);
             PluginRewriteOptimiser.patch(srv, MathHelper, plRewrite);
+            // Add features patches
+            if (FEATURES_PATCHES) {
+                DataCommandFeature.install(srv, MathHelper, stats);
+                EntityPropertiesFeature.install(srv, inject, MathHelper, stats);
+            }
             // Save in the jar if plugin rewrite is supported/installed
             manifest.getMainAttributes().putValue(
                     "Kibble-Rewrite", plRewrite[0]?"INSTALLED":"UNSUPPORTED");
+        } else {
+            // Add features in lib mode
+            if (FEATURES_PATCHES) {
+                EntityPropertiesFeature.installLib(inject);
+            }
         }
         if (COMPATIBILITY_PATCHES && !inject.containsKey("javax/xml/bind/DatatypeConverter.class")) {
             // These classes are used by some plugins but no longer available since java 9
