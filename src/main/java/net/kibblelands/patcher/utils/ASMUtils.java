@@ -1,4 +1,4 @@
-package net.kibblelands.patcher;
+package net.kibblelands.patcher.utils;
 
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Opcodes;

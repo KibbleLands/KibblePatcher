@@ -3,6 +3,9 @@ package net.kibblelands.patcher;
 import net.kibblelands.patcher.ext.ForEachRemover;
 import net.kibblelands.patcher.patches.*;
 import net.kibblelands.patcher.rebuild.ClassDataProvider;
+import net.kibblelands.patcher.utils.KibbleOutputStream;
+import net.kibblelands.patcher.utils.PatchMap;
+import net.kibblelands.patcher.utils.logger.Logger;
 import org.objectweb.asm.*;
 import org.objectweb.asm.tree.*;
 
@@ -20,13 +23,15 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
-import static net.kibblelands.patcher.ASMUtils.ASM_BUILD;
+import static net.kibblelands.patcher.utils.ASMUtils.ASM_BUILD;
 
 public class Main implements Opcodes {
+
+    private static Logger LOGGER = new Logger("KibblePatcher");
     private static final String CRAFT_BUKKIT_MAIN = "org/bukkit/craftbukkit/Main.class";
     private static final String BUKKIT_API = "org/bukkit/Bukkit.class";
     private static final String BUKKIT_VERSION_COMMAND = "org/bukkit/command/defaults/VersionCommand.class";
-    private static final String KIBBLE_VERSION = "0.7-dev";
+    private static final String KIBBLE_VERSION = "0.8-dev";
     /**
      * KillSwitch for compatibility patches
      * Can be disabled if your server doesn't require it
@@ -45,7 +50,7 @@ public class Main implements Opcodes {
 
     public static void main(String[] args) throws IOException {
         if (args.length != 2) {
-            System.err.print("Usage: \n" +
+            LOGGER.stdout("Usage: \n" +
                     "    java -jar KibblePatcher.jar <input> <output>\n" +
                     "    java -jar KibblePatcher.jar -patch <file>\n");
             System.exit(1);
@@ -53,7 +58,7 @@ public class Main implements Opcodes {
         }
         File in = new File(args[args[0].equals("-patch") ? 1 : 0]);
         if (!in.exists()) {
-            System.err.println("Input doesn't exists!");
+            LOGGER.error("Input doesn't exists!");
             System.exit(2);
             return;
         }
@@ -61,7 +66,7 @@ public class Main implements Opcodes {
     }
 
     public static void patchServerJar(File in, File out) throws IOException {
-        System.out.println("Reading jar..."); //////////////////////////////////////////////////////////////
+        LOGGER.info("Reading jar..."); //////////////////////////////////////////////////////////////
         byte[] origBytes = Files.readAllBytes(in.toPath());
         boolean javaZipMitigation = false;
         boolean libraryMode = false;
@@ -74,15 +79,16 @@ public class Main implements Opcodes {
         Map<String, byte[]> inject = new HashMap<>();
         Map<String, byte[]> srv = new PatchMap<>(orig, patch);
         if (srv.get(JarFile.MANIFEST_NAME) == null) {
-            System.err.println("The file is not a valid java archive!");
+            LOGGER.error("The file is not a valid java archive!");
             System.exit(4);
             return;
         }
         Manifest manifest = new Manifest(new ByteArrayInputStream(srv.get(JarFile.MANIFEST_NAME)));
-        if (manifest.getMainAttributes().containsKey("Kibble-Version")) {
+        if (manifest.getMainAttributes().containsKey("Kibble-Version") ||
+                srv.containsKey("net/kibblelands/server/FastMath.class")) {
             String kibbleVer = manifest.getMainAttributes().getValue("Kibble-Version");
-            System.err.println("The file was already patched by Kibble "+kibbleVer+"!");
-            System.err.println("Please use original server file for patching!");
+            LOGGER.error("The file was already patched by Kibble "+kibbleVer+"!");
+            LOGGER.warn("Please use original server file for patching!");
             System.exit(4);
             return;
         }
@@ -103,16 +109,16 @@ public class Main implements Opcodes {
         }
         if (COMPATIBILITY_PATCHES && !javaZipMitigation && MathHelper == null
                 && srv.get(CRAFT_BUKKIT_MAIN) == null && srv.get(BUKKIT_API) != null) {
-            System.out.println("API Patching mode! (Optimisations disabled)");
-            System.out.println("Warning: API Patching mode is not officially supported!");
+            LOGGER.warn("API Patching mode! (Optimisations disabled)");
+            LOGGER.warn("Warning: API Patching mode is not officially supported!");
             libraryMode = true;
         } else if (MathHelper == null || srv.get(CRAFT_BUKKIT_MAIN) == null) {
-            System.err.println("Server is not a valid spigot server!");
+            LOGGER.error("Server is not a valid spigot server!");
             if (MathHelper == null) {
-                System.err.println("MathHelper not found!");
+                LOGGER.error("MathHelper not found!");
             }
             if (srv.get(CRAFT_BUKKIT_MAIN) == null) {
-                System.err.println("CraftBukkit Main class not found!");
+                LOGGER.error("CraftBukkit Main class not found!");
             }
             System.exit(3);
             return;
@@ -121,7 +127,7 @@ public class Main implements Opcodes {
         ClassDataProvider classDataProvider = new ClassDataProvider(Main.class.getClassLoader());
         classDataProvider.addClasses(srv);
         System.gc(); // Clean memory
-        System.out.println("Patching jar..."); //////////////////////////////////////////////////////////////
+        LOGGER.info("Pawtching jar..."); //////////////////////////////////////////////////////////////
         int[] stats = {0, 0, 0, 0, 0, 0, 0};
         // Patch Manifest
         manifest.getMainAttributes().putValue("Kibble-Version", KIBBLE_VERSION);
@@ -157,6 +163,7 @@ public class Main implements Opcodes {
             BlockDataOptimiser.patch(srv, MathHelper, stats);
             BookCrashFixer.patch(srv, MathHelper, stats);
             PluginRewriteOptimiser.patch(srv, MathHelper, plRewrite);
+            NMSAccessOptimizer.patch(srv);
             // Add features patches
             if (FEATURES_PATCHES) {
                 DataCommandFeature.install(srv, MathHelper, stats);
@@ -171,7 +178,7 @@ public class Main implements Opcodes {
                 EntityPropertiesFeature.installLib(inject);
             }
         }
-        if (COMPATIBILITY_PATCHES && !inject.containsKey("javax/xml/bind/DatatypeConverter.class")) {
+        if (COMPATIBILITY_PATCHES && !srv.containsKey("javax/xml/bind/DatatypeConverter.class")) {
             // These classes are used by some plugins but no longer available since java 9
             inject.put("javax/xml/bind/DatatypeConverter.class",
                     readResource("javax/xml/bind/DatatypeConverter.class"));
@@ -265,7 +272,7 @@ public class Main implements Opcodes {
         orig = null;
         srv = null;
         System.gc(); // Clean memory
-        System.out.println("Building jar..."); //////////////////////////////////////////////////////////////
+        LOGGER.info("Building jar..."); //////////////////////////////////////////////////////////////
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
         patchZIP(new ByteArrayInputStream(origBytes), byteArrayOutputStream, manifest, patch, inject);
         origBytes = byteArrayOutputStream.toByteArray();
@@ -277,24 +284,25 @@ public class Main implements Opcodes {
             origBytes[0x08] = 0x08;
         }
         System.gc(); // Clean memory
-        System.out.println("Writing jar..."); //////////////////////////////////////////////////////////////
+        LOGGER.info("Writing jar..."); //////////////////////////////////////////////////////////////
         FileOutputStream fileOutputStream = new FileOutputStream(out);
         fileOutputStream.write(origBytes);
         fileOutputStream.flush();
         fileOutputStream.close();
-        System.out.println("Finished!");
-        System.out.println("Generic optimiser: ");
-        System.out.println("  Inlined calls: "+stats[0]);
-        System.out.println("  Optimised java calls: "+stats[1]);
-        System.out.println("  Optimised opcodes: "+stats[2]);
+        LOGGER.info("Finished!\n");
+        LOGGER.info("Generic optimiser: ");
+        LOGGER.info("  Inlined calls: "+stats[0]);
+        LOGGER.info("  Optimised java calls: "+stats[1]);
+        LOGGER.info("  Optimised opcodes: "+stats[2]);
         if (EXTERNAL_PATCHES) {
-            System.out.println("  Optimised forEach: " + stats[6]);
+            LOGGER.info("  Optimised forEach: " + stats[6]);
         }
-        System.out.println("Server patcher: ");
-        System.out.println("  Compatibility patches: "+stats[3]);
-        System.out.println("  Optimisations patches: "+stats[4]);
-        System.out.println("  Security patches: "+stats[5]);
-        System.out.println("  Plugin rewrite: "+(plRewrite[0]?"INSTALLED":"UNSUPPORTED"));
+
+        LOGGER.info("Server patcher: ");
+        LOGGER.info("  Compatibility patches: "+stats[3]);
+        LOGGER.info("  Optimisations patches: "+stats[4]);
+        LOGGER.info("  Security patches: "+stats[5]);
+        LOGGER.info("  Plugin rewrite: "+(plRewrite[0]?"INSTALLED":"UNSUPPORTED"));
     }
 
     public static Map<String,byte[]> readZIP(final InputStream in) throws IOException {
@@ -724,5 +732,9 @@ public class Main implements Opcodes {
             return false;
         }
         return true;
+    }
+
+    public static Logger getLOGGER() {
+        return LOGGER;
     }
 }

@@ -7,7 +7,7 @@ import org.objectweb.asm.tree.MethodNode;
 
 import java.util.Map;
 
-import static net.kibblelands.patcher.ASMUtils.ASM_BUILD;
+import static net.kibblelands.patcher.utils.ASMUtils.ASM_BUILD;
 
 public class BlockDataOptimiser implements Opcodes {
     private static final String NMS_BLOCK      = "net/minecraft/server/$NMS/Block";

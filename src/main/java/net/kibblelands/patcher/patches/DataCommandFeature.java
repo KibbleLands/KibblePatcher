@@ -1,6 +1,6 @@
 package net.kibblelands.patcher.patches;
 
-import net.kibblelands.patcher.ASMUtils;
+import net.kibblelands.patcher.utils.ASMUtils;
 import org.objectweb.asm.*;
 
 import java.util.Map;

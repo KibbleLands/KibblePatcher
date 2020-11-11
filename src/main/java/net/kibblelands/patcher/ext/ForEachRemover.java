@@ -6,7 +6,7 @@ From:
 
 package net.kibblelands.patcher.ext;
 
-import net.kibblelands.patcher.ASMUtils;
+import net.kibblelands.patcher.utils.ASMUtils;
 import net.kibblelands.patcher.rebuild.ClassDataProvider;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Opcodes;

@@ -9,7 +9,7 @@ import java.lang.reflect.Type;
 import java.security.SecureClassLoader;
 import java.util.*;
 
-import static net.kibblelands.patcher.ASMUtils.ASM_BUILD;
+import static net.kibblelands.patcher.utils.ASMUtils.ASM_BUILD;
 import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
 
 public class ClassDataProvider {
