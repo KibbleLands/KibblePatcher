@@ -58,6 +58,12 @@ public class Optimizer implements Opcodes {
                         methodNode.instructions.remove(insnNode);
                     }
                     break;
+                case POP:
+                    if (previous.getOpcode() == DUP) {
+                        methodNode.instructions.remove(previous);
+                        methodNode.instructions.remove(insnNode);
+                    }
+                    break;
             }
         }
     }

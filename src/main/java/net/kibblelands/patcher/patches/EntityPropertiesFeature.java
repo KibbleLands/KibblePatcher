@@ -1,6 +1,6 @@
 package net.kibblelands.patcher.patches;
 
-import net.kibblelands.patcher.Main;
+import net.kibblelands.patcher.KibblePatcher;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
@@ -81,7 +81,7 @@ public class EntityPropertiesFeature implements Opcodes {
                 classWriter.toByteArray());
         // Add PropertiesImpl
         classNode = new ClassNode();
-        new ClassReader(Main.readResource(propertiesImpl)).accept(classNode,0);
+        new ClassReader(KibblePatcher.readResource(propertiesImpl)).accept(classNode,0);
         classNode.access |= ACC_SYNTHETIC;
         classNode.fields.clear();
         classNode.methods.clear();
@@ -100,14 +100,14 @@ public class EntityPropertiesFeature implements Opcodes {
                 classWriter.toByteArray());
         // Install lib
         for (String file:propertiesApiClasses) {
-            inject.put(file, Main.readResource(file));
+            inject.put(file, KibblePatcher.readResource(file));
         }
     }
 
     public static void installLib(Map<String, byte[]> map) throws IOException {
         // Default Impl for tests
         ClassNode classNode = new ClassNode();
-        new ClassReader(Main.readResource(propertiesImpl)).accept(classNode,0);
+        new ClassReader(KibblePatcher.readResource(propertiesImpl)).accept(classNode,0);
         // Hide this to most dev tools to help beginners focus
         classNode.access |= ACC_SYNTHETIC;
         for (FieldNode fieldNode:classNode.fields) {
@@ -124,7 +124,7 @@ public class EntityPropertiesFeature implements Opcodes {
                 classWriter.toByteArray());
         // Install lib
         for (String file:propertiesApiClasses) {
-            map.put(file, Main.readResource(file));
+            map.put(file, KibblePatcher.readResource(file));
         }
     }
 }

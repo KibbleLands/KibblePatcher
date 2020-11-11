@@ -5,7 +5,7 @@ plugins {
 }
 
 group 'org.example'
-version '0.8-dev'
+version '1.0-rc1'
 
 repositories {
     mavenCentral()
@@ -38,6 +38,11 @@ dependencies {
         transitive = false
     }
 }
+
+tasks.withType(JavaCompile) {
+    options.encoding = "UTF-8"
+}
+
 /*
 jar.enabled = false
 

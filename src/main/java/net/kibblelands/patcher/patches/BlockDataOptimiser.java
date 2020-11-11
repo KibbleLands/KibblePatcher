@@ -65,12 +65,14 @@ public class BlockDataOptimiser implements Opcodes {
             wtf(NMS, "0x0"+i);
             return;
         }
-        value.access = ACC_PROTECTED;
+        value.access = ACC_PUBLIC;
         ClassWriter classWriter = new ClassWriter(0);
         classNode.accept(classWriter);
         map.put(BLOCK+".class", classWriter.toByteArray());
         for (Map.Entry<String, byte[]> entry : map.entrySet()) {
-            if (entry.getKey().endsWith(".class") && (entry.getKey().startsWith("net/minecraft/server/"))) {
+            if (entry.getKey().endsWith(".class") &&
+                    (entry.getKey().startsWith("net/minecraft/server/") ||
+                    entry.getKey().startsWith("org/bukkit/craftbukkit/"))) {
                 classWriter = new ClassWriter(0);
                 final MethodNode finalGetter = getter;
                 final MethodNode finalSetter = setter;
