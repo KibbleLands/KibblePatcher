@@ -36,7 +36,7 @@ public class KibblePatcher implements Opcodes {
     private static final String CRAFT_BUKKIT_MAIN = "org/bukkit/craftbukkit/Main.class";
     private static final String BUKKIT_API = "org/bukkit/Bukkit.class";
     private static final String BUKKIT_VERSION_COMMAND = "org/bukkit/command/defaults/VersionCommand.class";
-    private static final String KIBBLE_VERSION = "1.0-rc1";
+    private static final String KIBBLE_VERSION = "1.0";
     /**
      * KillSwitch for compatibility patches
      * Can be disabled if your server doesn't require it
@@ -354,14 +354,19 @@ public class KibblePatcher implements Opcodes {
                 continue;
             }
             entry.setMethod(ZipOutputStream.DEFLATED);
-            zip.putNextEntry(entry);
-            if (!entry.isDirectory()) {
+            if (entry.isDirectory()) {
+                zip.putNextEntry(entry);
+            } else {
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 int nRead;
                 while ((nRead = inputStream.read(buffer, 0, buffer.length)) != -1) {
                     baos.write(buffer, 0, nRead);
                 }
-                zip.write(patch.getOrDefault(entry.getName(), baos.toByteArray()));
+                byte[] data = patch.getOrDefault(entry.getName(), baos.toByteArray());
+                entry.setCompressedSize(-1);
+                entry.setSize(data.length);
+                zip.putNextEntry(entry);
+                zip.write(data);
             }
             zip.closeEntry();
         }
@@ -385,6 +390,7 @@ public class KibblePatcher implements Opcodes {
             public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
                 return new MethodVisitor(ASM_BUILD, super.visitMethod(access, name, descriptor, signature, exceptions)) {
                     boolean patch20 = false;
+                    boolean patch10 = false;
 
                     @Override
                     public void visitLdcInsn(Object value) {
@@ -392,10 +398,16 @@ public class KibblePatcher implements Opcodes {
                             if (((String) value).contains("will start in 20 seconds")) {
                                 patch20 = true;
                                 value = ((String) value).replace("20", "5");
+                            } else if (((String) value).equalsIgnoreCase("Starting server in 10 seconds")) {
+                                patch10 = true;
+                                value = ((String) value).replace("10", "5");
                             }
-                        } else if (patch20 && value instanceof Long) {
-                            if ((Long) value == 20L) {
+                        } else if (value instanceof Long) {
+                            if (patch20 && (Long) value == 20L) {
                                 patch20 = false;
+                                value = 5L;
+                            } else if (patch10 && (Long) value == 10L) {
+                                patch10 = false;
                                 value = 5L;
                             }
                         }
@@ -456,8 +468,9 @@ public class KibblePatcher implements Opcodes {
                     @Override
                     public void visitLdcInsn(Object value) {
                         if (value instanceof String) {
-                            if (((String) value).contains("Implementing API version")) {
-                                value = " Kibble " + KIBBLE_VERSION + " " + value;
+                            String ldc = (String) value;
+                            if (ldc.contains("Implementing API version")) {
+                                value = " \u00A7bKibble " + KIBBLE_VERSION + "\u00A7r" + (ldc.charAt(0) == ' ' ? "" : " ") + ldc;
                             }
                         }
                         super.visitLdcInsn(value);
