@@ -6,9 +6,13 @@ You can get support on our [Discord](https://discord.gg/qgk4Saq)
 
 ## How to use
 
+If you get a "`Server is not a valid spigot server!`" make sure it's not a hybrid server 
+*(Bukkit + Forge)* and that you followed all the steps to patch a spigot/paper jar
+
 1. Get you server .jar and KibblePatcher.jar  
-(The latest versions of Paper provide a patcher jar that is not the real server jar  
-please launch it one time and get the file named `/cache/patched_X.jar` instead)
+(The latest versions of Paper provide a vanilla jar patcher (named **paperclip**) 
+that is not the real server jar  please launch it once time and get the 
+file named `/cache/patched_X.jar` instead)
 2. Run the command `java -jar KibblePatcher.jar server.jar server-patched.jar`
 3. Use the `server-patched.jar` as a normal server jar
 
