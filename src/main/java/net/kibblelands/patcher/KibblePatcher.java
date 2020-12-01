@@ -144,6 +144,7 @@ public class KibblePatcher implements Opcodes {
                 EntityCompact.check(srv, MathHelper, stats);
                 PlayerPatcherCompact.check(srv, MathHelper, stats);
                 GuavaVarTypeCompact.check(srv, MathHelper, stats);
+                BukkitVarTypeCompact.check(srv, MathHelper, stats);
             }
             // Security patches
             BookCrashFixer.patch(srv, MathHelper, stats);

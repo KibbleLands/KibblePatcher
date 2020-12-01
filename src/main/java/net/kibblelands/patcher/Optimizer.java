@@ -31,21 +31,6 @@ public class Optimizer implements Opcodes {
                         stats[2]++;
                     }
                     break;
-                case IDIV: {
-                    switch (previous.getOpcode()) {
-                        case ICONST_2:
-                            ASMUtils.setOpcode(previous, ICONST_1);
-                            ASMUtils.setOpcode(insnNode, ISHR);
-                            stats[2]++;
-                            break;
-                        case ICONST_4:
-                            ASMUtils.setOpcode(previous, ICONST_2);
-                            ASMUtils.setOpcode(insnNode, ISHR);
-                            stats[2]++;
-                            break;
-                    }
-                    break;
-                }
                 case F2D:
                     if (previous.getOpcode() == D2F) {
                         methodNode.instructions.remove(previous);
@@ -60,6 +45,12 @@ public class Optimizer implements Opcodes {
                     break;
                 case POP:
                     if (previous.getOpcode() == DUP) {
+                        methodNode.instructions.remove(previous);
+                        methodNode.instructions.remove(insnNode);
+                    }
+                    break;
+                case POP2:
+                    if (previous.getOpcode() == DUP2) {
                         methodNode.instructions.remove(previous);
                         methodNode.instructions.remove(insnNode);
                     }
