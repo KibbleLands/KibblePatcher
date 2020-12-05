@@ -36,7 +36,8 @@ public class KibblePatcher implements Opcodes {
     private static final String CRAFT_BUKKIT_MAIN = "org/bukkit/craftbukkit/Main.class";
     private static final String BUKKIT_API = "org/bukkit/Bukkit.class";
     private static final String BUKKIT_VERSION_COMMAND = "org/bukkit/command/defaults/VersionCommand.class";
-    private static final String PAPER_JVM_CHECKER = "com/destroystokyo/paper/util/PaperJvmChecker.class";
+    private static final String PAPER_JVM_CHECKER_OLD = "com/destroystokyo/paper/util/PaperJvmChecker.class";
+    private static final String PAPER_JVM_CHECKER = "io/papermc/paper/util/PaperJvmChecker.class";
     private static final String KIBBLE_VERSION = "1.1";
     /**
      * KillSwitch for compatibility patches
@@ -143,6 +144,10 @@ public class KibblePatcher implements Opcodes {
             byte[] paperJvmCheck = srv.get(PAPER_JVM_CHECKER);
             if (paperJvmCheck != null) {
                 srv.put(PAPER_JVM_CHECKER, patchPaperJavaWarning(paperJvmCheck));
+            }
+            paperJvmCheck = srv.get(PAPER_JVM_CHECKER_OLD);
+            if (paperJvmCheck != null) {
+                srv.put(PAPER_JVM_CHECKER_OLD, patchPaperJavaWarning(paperJvmCheck));
             }
             if (compatibilityPatches) {
                 // Add commonly used APIs on old plugins
@@ -440,7 +445,8 @@ public class KibblePatcher implements Opcodes {
         ClassNode classNode = new ClassNode();
         classReader.accept(classNode, 0);
         for (MethodNode methodNode:classNode.methods) {
-            if (methodNode.name.equals("printWarning")) {
+            if (methodNode.name.equals("printWarning") ||
+                    methodNode.name.equals("checkJvm")) {
                 methodNode.instructions.clear();
                 methodNode.instructions.add(new InsnNode(RETURN));
             }
