@@ -36,7 +36,8 @@ public class KibblePatcher implements Opcodes {
     private static final String CRAFT_BUKKIT_MAIN = "org/bukkit/craftbukkit/Main.class";
     private static final String BUKKIT_API = "org/bukkit/Bukkit.class";
     private static final String BUKKIT_VERSION_COMMAND = "org/bukkit/command/defaults/VersionCommand.class";
-    private static final String KIBBLE_VERSION = "1.0";
+    private static final String PAPER_JVM_CHECKER = "com/destroystokyo/paper/util/PaperJvmChecker.class";
+    private static final String KIBBLE_VERSION = "1.1";
     /**
      * KillSwitch for compatibility patches
      * Can be disabled if your server doesn't require it
@@ -85,6 +86,8 @@ public class KibblePatcher implements Opcodes {
             StringUtil = "org/apache/commons/lang/StringUtils";
         } else if (srv.containsKey("org/apache/commons/lang3/StringUtils.class")) {
             StringUtil = "org/apache/commons/lang3/StringUtils";
+        } else if (srv.containsKey("org/bukkit/craftbukkit/libs/org/apache/commons/lang/StringUtils.class")) {
+            StringUtil = "org/bukkit/craftbukkit/libs/org/apache/commons/lang/StringUtils";
         } else if (srv.containsKey("org/bukkit/craftbukkit/libs/org/apache/commons/lang3/StringUtils.class")) {
             StringUtil = "org/bukkit/craftbukkit/libs/org/apache/commons/lang3/StringUtils";
         }
@@ -137,6 +140,10 @@ public class KibblePatcher implements Opcodes {
             srv.put(CRAFT_SERVER, patchGC(srv.get(CRAFT_SERVER), "reload", stats));
             String NMS_DEDICATED_SERVER = "net/minecraft/server/" + NMS + "/DedicatedServer.class";
             srv.put(NMS_DEDICATED_SERVER, patchGC(srv.get(NMS_DEDICATED_SERVER), "init", stats));
+            byte[] paperJvmCheck = srv.get(PAPER_JVM_CHECKER);
+            if (paperJvmCheck != null) {
+                srv.put(PAPER_JVM_CHECKER, patchPaperJavaWarning(paperJvmCheck));
+            }
             if (compatibilityPatches) {
                 // Add commonly used APIs on old plugins
                 OnlinePlayersCompact.check(srv, MathHelper, stats);
@@ -169,14 +176,22 @@ public class KibblePatcher implements Opcodes {
                 EntityPropertiesFeature.installLib(inject);
             }
         }
-        if (compatibilityPatches && !srv.containsKey("javax/xml/bind/DatatypeConverter.class")) {
-            // These classes are used by some plugins but no longer available since java 9
-            inject.put("javax/xml/bind/DatatypeConverter.class",
-                    readResource("javax/xml/bind/DatatypeConverter.class"));
-            inject.put("javax/xml/bind/annotation/adapters/XmlAdapter.class",
-                    readResource("javax/xml/bind/annotation/adapters/XmlAdapter.class"));
-            inject.put("javax/xml/bind/annotation/adapters/HexBinaryAdapter.class",
-                    readResource("javax/xml/bind/annotation/adapters/HexBinaryAdapter.class"));
+        if (compatibilityPatches) {
+            // These classes are used by some plugins but are no longer available since java 9
+            if (!srv.containsKey("javax/xml/bind/DatatypeConverter.class")) {
+                inject.put("javax/xml/bind/DatatypeConverter.class",
+                        readResource("javax/xml/bind/DatatypeConverter.class"));
+                inject.put("javax/xml/bind/annotation/adapters/XmlAdapter.class",
+                        readResource("javax/xml/bind/annotation/adapters/XmlAdapter.class"));
+                inject.put("javax/xml/bind/annotation/adapters/HexBinaryAdapter.class",
+                        readResource("javax/xml/bind/annotation/adapters/HexBinaryAdapter.class"));
+            }
+            if (!srv.containsKey("sun/misc/BASE64Decoder.class")) {
+                inject.put("sun/misc/BASE64Decoder.class",
+                        readResource("sun/misc/BASE64Decoder.class"));
+                inject.put("sun/misc/BASE64Encoder.class",
+                        readResource("sun/misc/BASE64Encoder.class"));
+            }
         }
         byte[] FastMathAPI = readResource("net/kibblelands/server/FastMath.class");
         byte[] FastReplaceAPI = readResource("net/kibblelands/server/FastReplace.class");
@@ -417,6 +432,21 @@ public class KibblePatcher implements Opcodes {
                 };
             }
         }, 0);
+        return classWriter.toByteArray();
+    }
+
+    public static byte[] patchPaperJavaWarning(byte[] bytes) throws IOException {
+        ClassReader classReader = new ClassReader(bytes);
+        ClassNode classNode = new ClassNode();
+        classReader.accept(classNode, 0);
+        for (MethodNode methodNode:classNode.methods) {
+            if (methodNode.name.equals("printWarning")) {
+                methodNode.instructions.clear();
+                methodNode.instructions.add(new InsnNode(RETURN));
+            }
+        }
+        ClassWriter classWriter = new ClassWriter(0);
+        classNode.accept(classWriter);
         return classWriter.toByteArray();
     }
 
