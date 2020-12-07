@@ -5,7 +5,7 @@ plugins {
 }
 
 group 'org.example'
-version '1.1'
+version '1.2'
 
 repositories {
     mavenCentral()
@@ -19,19 +19,32 @@ configurations {
 }
 
 jar {
+    from "LICENSE"
+
     manifest {
         attributes 'Main-Class': 'net.kibblelands.patcher.Main'
+        attributes 'KibblePatcher-Version': "${project.version}"
+        attributes 'KibblePatcher-Provider': 'KibbleLands'
     }
-    from {
-        configurations.shadow.collect { it.isDirectory() ? it : zipTree(it) }
+}
+
+afterEvaluate {
+    jar {
+        from(configurations.shadow.collect { it.isDirectory() ? it : zipTree(it) }) {
+            exclude("module-info.class")
+            exclude("org/fusesource/jansi/internal/native/FreeBSD/**")
+            exclude("org/fusesource/jansi/internal/native/Linux/**")
+            exclude("org/fusesource/jansi/internal/native/Mac/**")
+        }
     }
-    exclude("module-info.class")
 }
 
 dependencies {
     testCompile group: 'junit', name: 'junit', version: '4.12'
     implementation 'org.ow2.asm:asm-commons:9.0'
     shadow 'org.ow2.asm:asm-commons:9.0'
+    implementation 'org.fusesource.jansi:jansi:2.0.1'
+    shadow 'org.fusesource.jansi:jansi:2.0.1'
     // Bukkit dependency (Only used in net.kibblelands.server.*)
     compileOnly 'org.jetbrains:annotations:16.0.2'
     compileOnly('org.spigotmc:spigot-api:1.16.4-R0.1-SNAPSHOT') {

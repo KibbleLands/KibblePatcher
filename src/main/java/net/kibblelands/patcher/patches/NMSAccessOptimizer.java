@@ -10,7 +10,9 @@ public class NMSAccessOptimizer implements Opcodes {
 
     public static void patch(Map<String, byte[]> zip) {
         for (Map.Entry<String, byte[]> entry:zip.entrySet()) {
-            if ((entry.getKey().startsWith("net/minecraft/server/") && entry.getKey().endsWith(".class"))) {
+            if (((entry.getKey().startsWith("net/minecraft/server/") ||
+                    entry.getKey().startsWith("org/bukkit/craftbukkit/v"))
+                    && entry.getKey().endsWith(".class"))) {
                 ClassWriter classWriter = new ClassWriter(0);
                 ClassReader classReader = new ClassReader(entry.getValue());
                 classReader.accept(new ClassVisitor(ASM7, classWriter) {
@@ -22,6 +24,7 @@ public class NMSAccessOptimizer implements Opcodes {
                     @Override
                     public void visitInnerClass(String name, String outerName, String innerName, int access) {
                         if (outerName == null && innerName == null) {
+                            super.visitInnerClass(name, null, null, access);
                             return;
                         }
                         super.visitInnerClass(name, outerName, innerName, (access&MASK)|ACC_PUBLIC);

@@ -6,9 +6,9 @@ import java.util.Objects;
 import java.util.function.Function;
 
 public interface EntityProperty<T> {
-    T get(Entity player);
+    T get(Entity entity);
 
-    void set(Entity player, T property);
+    void set(Entity entity, T property);
 
     default void clear(Entity entity) {
         this.set(entity, null);

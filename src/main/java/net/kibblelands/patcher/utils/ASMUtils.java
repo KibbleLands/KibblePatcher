@@ -72,6 +72,15 @@ public class ASMUtils implements Opcodes {
         return null;
     }
 
+    public static FieldNode findFieldBySignature(ClassNode classNode,String signature) {
+        for (FieldNode fieldNode:classNode.fields) {
+            if ((!fieldNode.name.startsWith("<")) && signature.equals(fieldNode.signature)) {
+                return fieldNode;
+            }
+        }
+        return null;
+    }
+
     public static void setOpcode(AbstractInsnNode insnNode,int opcode) {
         ASMTreeAccessHelper.setOpcode(insnNode, opcode);
     }

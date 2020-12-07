@@ -38,7 +38,7 @@ public class KibblePatcher implements Opcodes {
     private static final String BUKKIT_VERSION_COMMAND = "org/bukkit/command/defaults/VersionCommand.class";
     private static final String PAPER_JVM_CHECKER_OLD = "com/destroystokyo/paper/util/PaperJvmChecker.class";
     private static final String PAPER_JVM_CHECKER = "io/papermc/paper/util/PaperJvmChecker.class";
-    private static final String KIBBLE_VERSION = "1.1";
+    private static final String KIBBLE_VERSION = "1.2";
     /**
      * KillSwitch for compatibility patches
      * Can be disabled if your server doesn't require it
@@ -56,6 +56,17 @@ public class KibblePatcher implements Opcodes {
     public boolean featuresPatches = true;
 
     public void patchServerJar(File in, File out) throws IOException {
+        String paperVer = PaperClipSupport.getPaperClipMCVer(in);
+        if (paperVer != null) {
+            logger.info("Generating paperclip server...");
+            this.patchServerJar0(PaperClipSupport.patchPaperClip(in, paperVer), out);
+            PaperClipSupport.cleanPaperClip();
+        } else {
+           this.patchServerJar0(in, out);
+        }
+    }
+
+    private void patchServerJar0(File in, File out) throws IOException {
         logger.info("Reading jar..."); //////////////////////////////////////////////////////////////
         byte[] origBytes = Files.readAllBytes(in.toPath());
         boolean javaZipMitigation = false;
@@ -171,6 +182,7 @@ public class KibblePatcher implements Opcodes {
             if (featuresPatches) {
                 DataCommandFeature.install(srv, MathHelper, stats);
                 EntityPropertiesFeature.install(srv, inject, MathHelper, stats);
+                BiomeConfigAPIFeature.install(srv, inject, MathHelper, classDataProvider, stats);
             }
             // Save in the jar if plugin rewrite is supported/installed
             manifest.getMainAttributes().putValue(
@@ -179,6 +191,7 @@ public class KibblePatcher implements Opcodes {
             // Add features in lib mode
             if (featuresPatches) {
                 EntityPropertiesFeature.installLib(inject);
+                BiomeConfigAPIFeature.installLib(srv, inject);
             }
         }
         if (compatibilityPatches) {
@@ -445,13 +458,16 @@ public class KibblePatcher implements Opcodes {
         ClassNode classNode = new ClassNode();
         classReader.accept(classNode, 0);
         for (MethodNode methodNode:classNode.methods) {
-            if (methodNode.name.equals("printWarning") ||
-                    methodNode.name.equals("checkJvm")) {
+            if ((methodNode.name.equals("printWarning") ||
+                    methodNode.name.equals("checkJvm")) &&
+                    methodNode.desc.endsWith(")V")) {
                 methodNode.instructions.clear();
                 methodNode.instructions.add(new InsnNode(RETURN));
+                methodNode.tryCatchBlocks.clear();
+                methodNode.localVariables.clear();
             }
         }
-        ClassWriter classWriter = new ClassWriter(0);
+        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         classNode.accept(classWriter);
         return classWriter.toByteArray();
     }
