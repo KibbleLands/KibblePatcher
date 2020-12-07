@@ -54,6 +54,11 @@ public class KibblePatcher implements Opcodes {
      * Can be disabled if your server doesn't require it
      */
     public boolean featuresPatches = true;
+    /**
+     * Special mode for the YatopiaMC build process
+     * https://github.com/YatopiaMC/Yatopia
+     */
+    public boolean yatopiaMode = false;
 
     public void patchServerJar(File in, File out) throws IOException {
         String paperVer = PaperClipSupport.getPaperClipMCVer(in);
@@ -93,6 +98,8 @@ public class KibblePatcher implements Opcodes {
             System.exit(4);
             return;
         }
+        boolean isYatopiaPatched = (!this.yatopiaMode) &&
+                manifest.getMainAttributes().containsKey("Kibble-Yatopia");
         String StringUtil = null;
         if (srv.containsKey("org/apache/commons/lang/StringUtils.class")) {
             StringUtil = "org/apache/commons/lang/StringUtils";
@@ -112,6 +119,9 @@ public class KibblePatcher implements Opcodes {
         }
         if (compatibilityPatches && !javaZipMitigation && MathHelper == null
                 && srv.get(CRAFT_BUKKIT_MAIN) == null && srv.get(BUKKIT_API) != null) {
+            if (this.yatopiaMode) {
+                throw new Error("Yatopia mode is incompatible with library patching!");
+            }
             logger.warn("API Patching mode! (Optimisations disabled)");
             logger.warn("Warning: API Patching mode is not officially supported!");
             libraryMode = true;
@@ -133,9 +143,14 @@ public class KibblePatcher implements Opcodes {
         logger.info("Pawtching jar..."); //////////////////////////////////////////////////////////////
         int[] stats = {0, 0, 0, 0, 0, 0, 0};
         // Patch Manifest
-        manifest.getMainAttributes().putValue("Kibble-Version", KIBBLE_VERSION);
+        manifest.getMainAttributes().putValue(this.yatopiaMode ? "Kibble-Yatopia" : "Kibble-Version", KIBBLE_VERSION);
         final boolean[] plRewrite = new boolean[]{false};
-        if (!libraryMode) {
+        if (this.yatopiaMode) {
+            if (!libraryMode) {
+                BlockDataOptimiser.patch(srv, MathHelper, stats);
+                NMSAccessOptimizer.patch(srv);
+            }
+        } else if (!libraryMode) {
             if (manifest.getAttributes("net/minecraft/server/") == null) {
                 Attributes attributes = new Attributes();
                 attributes.putValue("Sealed", "true");
@@ -173,11 +188,13 @@ public class KibblePatcher implements Opcodes {
             BookCrashFixer.patch(srv, MathHelper, stats);
             AuthenticationHardening.patch(srv, MathHelper, stats);
             // Specific optimisations
-            ChunkCacheOptimizer.patch(srv, MathHelper, stats);
-            MethodResultCacheOptimizer.patch(srv, MathHelper, stats);
-            BlockDataOptimiser.patch(srv, MathHelper, stats);
-            PluginRewriteOptimiser.patch(srv, MathHelper, plRewrite);
-            NMSAccessOptimizer.patch(srv);
+            if (!isYatopiaPatched) {
+                ChunkCacheOptimizer.patch(srv, MathHelper, stats);
+                MethodResultCacheOptimizer.patch(srv, MathHelper, stats);
+                BlockDataOptimiser.patch(srv, MathHelper, stats);
+                PluginRewriteOptimiser.patch(srv, MathHelper, plRewrite);
+                NMSAccessOptimizer.patch(srv);
+            }
             // Add features patches
             if (featuresPatches) {
                 DataCommandFeature.install(srv, MathHelper, stats);
@@ -185,8 +202,8 @@ public class KibblePatcher implements Opcodes {
                 BiomeConfigAPIFeature.install(srv, inject, MathHelper, classDataProvider, stats);
             }
             // Save in the jar if plugin rewrite is supported/installed
-            manifest.getMainAttributes().putValue(
-                    "Kibble-Rewrite", plRewrite[0]?"INSTALLED":"UNSUPPORTED");
+            manifest.getMainAttributes().putValue("Kibble-Rewrite",
+                    isYatopiaPatched?"BUILT-IN":plRewrite[0]?"INSTALLED":"UNSUPPORTED");
         } else {
             // Add features in lib mode
             if (featuresPatches) {
@@ -211,74 +228,76 @@ public class KibblePatcher implements Opcodes {
                         readResource("sun/misc/BASE64Encoder.class"));
             }
         }
-        byte[] FastMathAPI = readResource("net/kibblelands/server/FastMath.class");
-        byte[] FastReplaceAPI = readResource("net/kibblelands/server/FastReplace.class");
-        if (!libraryMode) { // Mirror FastMath to MathHelper
-            ClassNode classNode = new ClassNode();
-            new ClassReader(FastMathAPI).accept(classNode, 0);
-            for (MethodNode methodNode:classNode.methods) {
-                if (!methodNode.name.startsWith("<")) {
-                    methodNode.instructions.clear();
-                    boolean d2f = methodNode.desc.indexOf('D') != -1;
-                    if (d2f) {
-                        methodNode.instructions.add(new VarInsnNode(DLOAD, 0));
-                        methodNode.instructions.add(new InsnNode(D2F));
-                    } else {
-                        methodNode.instructions.add(new VarInsnNode(FLOAD, 0));
-                    }
-                    methodNode.instructions.add(new MethodInsnNode(INVOKESTATIC,
-                            MathHelper, methodNode.name, "(F)F", false));
-                    if (d2f) {
-                        methodNode.instructions.add(new InsnNode(F2D));
-                        methodNode.instructions.add(new InsnNode(DRETURN));
-                    } else {
-                        methodNode.instructions.add(new InsnNode(FRETURN));
-                    }
-                }
-            }
-            ClassWriter classWriter = classDataProvider.newClassWriter();
-            classNode.accept(classWriter);
-            FastMathAPI = classWriter.toByteArray();
-            if (StringUtil != null) {
-                classNode = new ClassNode();
-                new ClassReader(FastReplaceAPI).accept(classNode, 0);
-                for (MethodNode methodNode:classNode.methods) {
+        if (!this.yatopiaMode) {
+            byte[] FastMathAPI = readResource("net/kibblelands/server/FastMath.class");
+            byte[] FastReplaceAPI = readResource("net/kibblelands/server/FastReplace.class");
+            if (!libraryMode) { // Mirror FastMath to MathHelper
+                ClassNode classNode = new ClassNode();
+                new ClassReader(FastMathAPI).accept(classNode, 0);
+                for (MethodNode methodNode : classNode.methods) {
                     if (!methodNode.name.startsWith("<")) {
-                        if (methodNode.desc.contains("CharSequence")) {
-                            for (AbstractInsnNode insnNode:methodNode.instructions) {
-                                if (insnNode.getOpcode() == INVOKESTATIC) {
-                                    MethodInsnNode methodInsnNode = (MethodInsnNode) insnNode;
-                                    if (methodInsnNode.name.equals("replace")) {
-                                        methodInsnNode.owner = StringUtil;
-                                        break;
-                                    }
-                                }
-                            }
+                        methodNode.instructions.clear();
+                        boolean d2f = methodNode.desc.indexOf('D') != -1;
+                        if (d2f) {
+                            methodNode.instructions.add(new VarInsnNode(DLOAD, 0));
+                            methodNode.instructions.add(new InsnNode(D2F));
                         } else {
-                            methodNode.instructions.clear();
-                            methodNode.instructions.add(new VarInsnNode(ALOAD, 0));
-                            methodNode.instructions.add(new VarInsnNode(ALOAD, 1));
-                            methodNode.instructions.add(new VarInsnNode(ALOAD, 2));
-                            methodNode.instructions.add(new MethodInsnNode(INVOKESTATIC,
-                                    StringUtil, "replace", methodNode.desc, false));
-                            methodNode.instructions.add(new InsnNode(ARETURN));
+                            methodNode.instructions.add(new VarInsnNode(FLOAD, 0));
+                        }
+                        methodNode.instructions.add(new MethodInsnNode(INVOKESTATIC,
+                                MathHelper, methodNode.name, "(F)F", false));
+                        if (d2f) {
+                            methodNode.instructions.add(new InsnNode(F2D));
+                            methodNode.instructions.add(new InsnNode(DRETURN));
+                        } else {
+                            methodNode.instructions.add(new InsnNode(FRETURN));
                         }
                     }
                 }
-                classWriter = classDataProvider.newClassWriter();
+                ClassWriter classWriter = classDataProvider.newClassWriter();
                 classNode.accept(classWriter);
-                FastReplaceAPI = classWriter.toByteArray();
+                FastMathAPI = classWriter.toByteArray();
+                if (StringUtil != null) {
+                    classNode = new ClassNode();
+                    new ClassReader(FastReplaceAPI).accept(classNode, 0);
+                    for (MethodNode methodNode : classNode.methods) {
+                        if (!methodNode.name.startsWith("<")) {
+                            if (methodNode.desc.contains("CharSequence")) {
+                                for (AbstractInsnNode insnNode : methodNode.instructions) {
+                                    if (insnNode.getOpcode() == INVOKESTATIC) {
+                                        MethodInsnNode methodInsnNode = (MethodInsnNode) insnNode;
+                                        if (methodInsnNode.name.equals("replace")) {
+                                            methodInsnNode.owner = StringUtil;
+                                            break;
+                                        }
+                                    }
+                                }
+                            } else {
+                                methodNode.instructions.clear();
+                                methodNode.instructions.add(new VarInsnNode(ALOAD, 0));
+                                methodNode.instructions.add(new VarInsnNode(ALOAD, 1));
+                                methodNode.instructions.add(new VarInsnNode(ALOAD, 2));
+                                methodNode.instructions.add(new MethodInsnNode(INVOKESTATIC,
+                                        StringUtil, "replace", methodNode.desc, false));
+                                methodNode.instructions.add(new InsnNode(ARETURN));
+                            }
+                        }
+                    }
+                    classWriter = classDataProvider.newClassWriter();
+                    classNode.accept(classWriter);
+                    FastReplaceAPI = classWriter.toByteArray();
+                }
             }
+            inject.put("net/kibblelands/server/FastMath.class", FastMathAPI);
+            inject.put("net/kibblelands/server/FastReplace.class", FastReplaceAPI);
         }
-        inject.put("net/kibblelands/server/FastMath.class", FastMathAPI);
-        inject.put("net/kibblelands/server/FastReplace.class", FastReplaceAPI);
         // Optimise all classes
         srv.values().removeIf(Objects::isNull); // Clean null elements
         if (!libraryMode) {
             for (Map.Entry<String, byte[]> entry : srv.entrySet()) {
                 if (entry.getKey().endsWith(".class")) {
                     patchClassOpt(entry, classDataProvider, entry.getKey()
-                            .startsWith("net/minecraft/server/") ? null : MathHelper, stats);
+                            .startsWith("net/minecraft/server/") ? null : MathHelper, stats, isYatopiaPatched);
                 } else if (entry.getKey().equals("pack.mcmeta") || entry.getKey().endsWith(".json")) {
                     trimJSON(entry);
                 }
@@ -291,7 +310,7 @@ public class KibblePatcher implements Opcodes {
                         .replace("ambient-spawns: 1", "ambient-spawns: 2").getBytes(StandardCharsets.UTF_8));
             }
             // Get stats in final jar
-            manifest.getMainAttributes().putValue("Kibble-Stats", Arrays.toString(stats));
+            manifest.getMainAttributes().putValue(this.yatopiaMode ? "Kibble-Yatopia-Stats" : "Kibble-Stats", Arrays.toString(stats));
         }
         orig = null;
         srv = null;
@@ -314,19 +333,23 @@ public class KibblePatcher implements Opcodes {
         fileOutputStream.flush();
         fileOutputStream.close();
         logger.info("Finished!\n");
-        logger.info("Generic optimiser: ");
-        logger.info("  Inlined calls: "+stats[0]);
-        logger.info("  Optimised java calls: "+stats[1]);
-        logger.info("  Optimised opcodes: "+stats[2]);
-        if (externalPatches) {
-            logger.info("  Optimised forEach: " + stats[6]);
+        if (isYatopiaPatched) {
+            logger.info("Generic optimiser: Skipped");
+        } else {
+            logger.info("Generic optimiser: ");
+            logger.info("  Inlined calls: " + stats[0]);
+            logger.info("  Optimised java calls: " + stats[1]);
+            logger.info("  Optimised opcodes: " + stats[2]);
+            if (externalPatches) {
+                logger.info("  Optimised forEach: " + stats[6]);
+            }
         }
-
         logger.info("Server patcher: ");
         logger.info("  Compatibility patches: "+stats[3]);
         logger.info("  Optimisations patches: "+stats[4]);
         logger.info("  Security patches: "+stats[5]);
-        logger.info("  Plugin rewrite: "+(plRewrite[0]?
+        logger.info("  Plugin rewrite: "+(isYatopiaPatched?
+                (ConsoleColors.CYAN + "BUILT-IN"):plRewrite[0]?
                 (ConsoleColors.CYAN + "INSTALLED"):
                 (ConsoleColors.YELLOW + "UNSUPPORTED")));
     }
@@ -559,14 +582,16 @@ public class KibblePatcher implements Opcodes {
         return classWriter.toByteArray();
     }
 
-    public void patchClassOpt(Map.Entry<String, byte[]> p,ClassDataProvider cdp,String Math,final int[] stats) throws IOException {
-        patchClassOpt(p, cdp, Math, stats, false);
+    public void patchClassOpt(Map.Entry<String, byte[]> p,ClassDataProvider cdp,
+                              String Math,final int[] stats,final boolean isYatopia) throws IOException {
+        patchClassOpt(p, cdp, Math, stats, isYatopia, false);
     }
 
     private static final String replaceDesc =
             "(Ljava/lang/String;Ljava/lang/CharSequence;Ljava/lang/CharSequence;)Ljava/lang/String;";
 
-    private void patchClassOpt(final Map.Entry<String, byte[]> p,ClassDataProvider cdp,String Math,final int[] stats,final boolean err) throws IOException {
+    private void patchClassOpt(final Map.Entry<String, byte[]> p,ClassDataProvider cdp,
+                               String Math, final int[] stats,final boolean isYatopia,final boolean err) throws IOException {
         boolean[] requireCalc_dontOptimise = new boolean[]{false, false};
         ClassReader classReader = new ClassReader(p.getValue());
         ClassNode classNode = new ClassNode();
@@ -575,61 +600,70 @@ public class KibblePatcher implements Opcodes {
             ForEachRemover.transform(classNode, cdp, stats);
         }
         ClassWriter classWriter = err ? new ClassWriter(0) : cdp.newClassWriter();
-        classNode.accept(new ClassVisitor(ASM_BUILD, classWriter) {
-            @Override
-            public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
-                super.visit(version, access, name, signature, superName, interfaces);
-                requireCalc_dontOptimise[1] = (version < V1_6 && !name.startsWith("net/minecraft/server/")
-                        && !(name.startsWith("org/bukkit/") && !name.startsWith("org/bukkit/craftbukkit/libs/")));
-            }
+        if (isYatopia) { // Don't optimise if Yatopia based server
+            classNode.accept(classWriter);
+            requireCalc_dontOptimise[1] = (classNode.version < V1_6 && !classNode.name.startsWith("net/minecraft/server/")
+                    && !(classNode.name.startsWith("org/bukkit/") && !classNode.name.startsWith("org/bukkit/craftbukkit/libs/")));
+        } else {
+            classNode.accept(new ClassVisitor(ASM_BUILD, classWriter) {
+                @Override
+                public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
+                    super.visit(version, access, name, signature, superName, interfaces);
+                    requireCalc_dontOptimise[1] = (version < V1_6 && !name.startsWith("net/minecraft/server/")
+                            && !(name.startsWith("org/bukkit/") && !name.startsWith("org/bukkit/craftbukkit/libs/")));
+                }
 
-            @Override
-            public MethodVisitor visitMethod(int access,final String m_name,final String m_descriptor, String signature, String[] exceptions) {
-                if (requireCalc_dontOptimise[1]) return new MethodVisitor(ASM_BUILD) {};
-                final MethodVisitor parentMethodVisitor = super.visitMethod(access, m_name, m_descriptor, signature, exceptions);
-                return new MethodVisitor(ASM_BUILD, new MethodNode(access, m_name, m_descriptor, signature, exceptions)) {
-                    @Override
-                    public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
-                        if (opcode == INVOKESTATIC && (owner.equals("java/lang/Math") || owner.equals("java/lang/StrictMath") || owner.equals("net/minecraft/util/Mth"))) {
-                            if (Math != null && (owner.equals("java/lang/Math") || owner.equals("java/lang/StrictMath")) && (name.equals("sin") || name.equals("cos"))) {
-                                owner = Math;
-                                stats[1]++;
-                                if (descriptor.endsWith(")D")) {
-                                    super.visitInsn(D2F);
-                                    super.visitMethodInsn(opcode, owner, name, descriptor.replace('D', 'F'), isInterface);
-                                    super.visitInsn(F2D);
-                                    requireCalc_dontOptimise[0] = true;
-                                    return;
+                @Override
+                public MethodVisitor visitMethod(int access, final String m_name, final String m_descriptor, String signature, String[] exceptions) {
+                    if (requireCalc_dontOptimise[1]) return new MethodVisitor(ASM_BUILD) {
+                    };
+                    final MethodVisitor parentMethodVisitor = super.visitMethod(access, m_name, m_descriptor, signature, exceptions);
+                    return new MethodVisitor(ASM_BUILD, new MethodNode(access, m_name, m_descriptor, signature, exceptions)) {
+                        @Override
+                        public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
+                            if (opcode == INVOKESTATIC && (owner.equals("java/lang/Math") || owner.equals("java/lang/StrictMath") || owner.equals("net/minecraft/util/Mth"))) {
+                                if (Math != null && (owner.equals("java/lang/Math") || owner.equals("java/lang/StrictMath")) && (name.equals("sin") || name.equals("cos"))) {
+                                    owner = Math;
+                                    stats[1]++;
+                                    if (descriptor.endsWith(")D")) {
+                                        super.visitInsn(D2F);
+                                        super.visitMethodInsn(opcode, owner, name, descriptor.replace('D', 'F'), isInterface);
+                                        super.visitInsn(F2D);
+                                        requireCalc_dontOptimise[0] = true;
+                                        return;
+                                    }
+                                } else if (owner.equals("java/lang/Math") && (name.equals("sqrt") || name.equals("sin") || name.equals("cos") || name.equals("asin") || name.equals("acos"))) {
+                                    owner = "java/lang/StrictMath";
+                                    stats[1]++;
                                 }
-                            } else if (owner.equals("java/lang/Math") && (name.equals("sqrt") || name.equals("sin") || name.equals("cos") || name.equals("asin") || name.equals("acos"))) {
-                                owner = "java/lang/StrictMath";
+                                if (!inline0(this, opcode, owner, name, descriptor, isInterface)) {
+                                    super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
+                                } else {
+                                    stats[0]++;
+                                    requireCalc_dontOptimise[0] = true;
+                                }
+                                return;
+                            } else if (opcode == INVOKEVIRTUAL && owner.equals("java/lang/String") &&
+                                    name.equals("replace") && descriptor.contains("CharSequence")) {
+                                opcode = INVOKESTATIC;
+                                owner = KibblePatcher.this.yatopiaMode ?
+                                        "org/yatopiamc/yatopia/server/util/FastReplace" :
+                                        "net/kibblelands/server/FastReplace";
+                                descriptor = replaceDesc;
                                 stats[1]++;
                             }
-                            if (!inline0(this, opcode, owner, name, descriptor, isInterface)) {
-                                super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
-                            } else {
-                                stats[0]++;
-                                requireCalc_dontOptimise[0] = true;
-                            }
-                            return;
-                        } else if (opcode == INVOKEVIRTUAL && owner.equals("java/lang/String") &&
-                                name.equals("replace") && descriptor.contains("CharSequence")) {
-                            opcode = INVOKESTATIC;
-                            owner = "net/kibblelands/server/FastReplace";
-                            descriptor = replaceDesc;
-                            stats[1]++;
+                            super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
                         }
-                        super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
-                    }
 
-                    @Override
-                    public void visitEnd() {
-                        Optimizer.optimize(((MethodNode)this.mv), stats);
-                        ((MethodNode)this.mv).accept(parentMethodVisitor);
-                    }
-                };
-            }
-        });
+                        @Override
+                        public void visitEnd() {
+                            Optimizer.optimize(((MethodNode) this.mv), stats);
+                            ((MethodNode) this.mv).accept(parentMethodVisitor);
+                        }
+                    };
+                }
+            });
+        }
         if (err) {
             Files.write(new File("malformed.class").toPath(), classWriter.toByteArray());
         } else {
@@ -648,7 +682,7 @@ public class KibblePatcher implements Opcodes {
                                 super.visitMaxs(maxStack, maxLocals);
                             } catch (Throwable t) {
                                 try {
-                                    patchClassOpt(p, cdp, Math, stats, true);
+                                    patchClassOpt(p, cdp, Math, stats, isYatopia, true);
                                 } catch (IOException ignored) {}
                                 throw new RuntimeException("Malformed method at "+p.getKey()+"#"+m_name+m_descriptor, t);
                             }
