@@ -7,9 +7,9 @@ You can get support on our [Discord](https://discord.gg/qgk4Saq)
 ## How to use
 
 If you get a "`Server is not a valid spigot server!`" make sure it's not a hybrid server 
-*(Bukkit + Forge)* and that you followed all the steps to patch a spigot/paper jar
+*(Bukkit + Forge)*
 
-1. Get you server.jar and KibblePatcher.jar  
+1. Get you server.jar and KibblePatcher.jar *(You can use [Yatopia](https://yatopiamc.org/download.html) as your server jar)*  
 ~~(The latest versions of Paper provide a vanilla jar patcher (named **paperclip**) 
 that is not the real server jar  please launch it once time and get the 
 file named `/cache/patched_X.jar` instead)~~ **(No longer required since 1.2)**
