@@ -9,6 +9,11 @@ public class Main {
     private static final Logger LOGGER = new Logger("KibblePatcher");
 
     public static void main(String[] args) throws IOException {
+        boolean yatopiaMode = false;
+        if (args.length == 3 && "-yatopia".equals(args[0])) {
+            args = new String[]{args[1], args[2]};
+            yatopiaMode = true;
+        }
         if (args.length != 2) {
             LOGGER.stdout("Usage: \n" +
                     "    java -jar KibblePatcher.jar <input> <output>\n" +
@@ -22,6 +27,13 @@ public class Main {
             System.exit(2);
             return;
         }
-        new KibblePatcher(LOGGER).patchServerJar(in, new File(args[1]));
+        KibblePatcher kibblePatcher = new KibblePatcher(LOGGER);
+        if (yatopiaMode) {
+            kibblePatcher.compatibilityPatches = false;
+            kibblePatcher.featuresPatches = false;
+            kibblePatcher.yatopiaMode = true;
+        }
+        kibblePatcher.patchServerJar(in, new File(args[1]));
+        System.exit(0);
     }
 }

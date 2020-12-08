@@ -4,7 +4,7 @@ package net.kibblelands.server;
  * This class is edited automatically by the patcher
  * to use Apache common lang implementation of replace
  */
-public class FastReplace {
+public final class FastReplace {
     private FastReplace() {}
 
     public static String replace(String string,CharSequence from,CharSequence to) {

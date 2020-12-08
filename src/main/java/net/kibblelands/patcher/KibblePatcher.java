@@ -294,20 +294,24 @@ public class KibblePatcher implements Opcodes {
         // Optimise all classes
         srv.values().removeIf(Objects::isNull); // Clean null elements
         if (!libraryMode) {
-            for (Map.Entry<String, byte[]> entry : srv.entrySet()) {
-                if (entry.getKey().endsWith(".class")) {
-                    patchClassOpt(entry, classDataProvider, entry.getKey()
-                            .startsWith("net/minecraft/server/") ? null : MathHelper, stats, isYatopiaPatched);
-                } else if (entry.getKey().equals("pack.mcmeta") || entry.getKey().endsWith(".json")) {
-                    trimJSON(entry);
+            if (!isYatopiaPatched) {
+                for (Map.Entry<String, byte[]> entry : srv.entrySet()) {
+                    if (entry.getKey().endsWith(".class")) {
+                        patchClassOpt(entry, classDataProvider, entry.getKey().startsWith("org/apache/commons/math3/") ||
+                                entry.getKey().startsWith("net/minecraft/server/") ? null : MathHelper, stats, isYatopiaPatched);
+                    } else if (entry.getKey().equals("pack.mcmeta") || entry.getKey().endsWith(".json")) {
+                        trimJSON(entry);
+                    }
                 }
             }
-            // Patch default config for performance
-            if (srv.get("configurations/bukkit.yml") != null) {
-                srv.put("configurations/bukkit.yml", new String(srv.get("configurations/bukkit.yml"), StandardCharsets.UTF_8)
-                        .replace("query-plugins: true", "query-plugins: false")
-                        .replace("monster-spawns: 1", "monster-spawns: 2").replace("water-spawns: 1", "water-spawns: 2")
-                        .replace("ambient-spawns: 1", "ambient-spawns: 2").getBytes(StandardCharsets.UTF_8));
+            if (!this.yatopiaMode) {
+                // Patch default config for performance
+                if (srv.get("configurations/bukkit.yml") != null) {
+                    srv.put("configurations/bukkit.yml", new String(srv.get("configurations/bukkit.yml"), StandardCharsets.UTF_8)
+                            .replace("query-plugins: true", "query-plugins: false")
+                            .replace("monster-spawns: 1", "monster-spawns: 2").replace("water-spawns: 1", "water-spawns: 2")
+                            .replace("ambient-spawns: 1", "ambient-spawns: 2").getBytes(StandardCharsets.UTF_8));
+                }
             }
             // Get stats in final jar
             manifest.getMainAttributes().putValue(this.yatopiaMode ? "Kibble-Yatopia-Stats" : "Kibble-Stats", Arrays.toString(stats));
@@ -333,6 +337,9 @@ public class KibblePatcher implements Opcodes {
         fileOutputStream.flush();
         fileOutputStream.close();
         logger.info("Finished!\n");
+        if (this.yatopiaMode) {
+            return;
+        }
         if (isYatopiaPatched) {
             logger.info("Generic optimiser: Skipped");
         } else {
@@ -621,8 +628,8 @@ public class KibblePatcher implements Opcodes {
                     return new MethodVisitor(ASM_BUILD, new MethodNode(access, m_name, m_descriptor, signature, exceptions)) {
                         @Override
                         public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
-                            if (opcode == INVOKESTATIC && (owner.equals("java/lang/Math") || owner.equals("java/lang/StrictMath") || owner.equals("net/minecraft/util/Mth"))) {
-                                if (Math != null && (owner.equals("java/lang/Math") || owner.equals("java/lang/StrictMath")) && (name.equals("sin") || name.equals("cos"))) {
+                            if (opcode == INVOKESTATIC && (owner.equals("java/lang/Math") || owner.equals("java/lang/StrictMath"))) {
+                                if (Math != null && (name.equals("sin") || name.equals("cos"))) {
                                     owner = Math;
                                     stats[1]++;
                                     if (descriptor.endsWith(")D")) {

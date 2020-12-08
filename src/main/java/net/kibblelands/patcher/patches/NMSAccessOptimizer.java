@@ -8,6 +8,7 @@ public class NMSAccessOptimizer implements Opcodes {
     private static final int MASK = ~(ACC_PRIVATE);
     private static final int MASK2 = ~(ACC_PRIVATE|ACC_PROTECTED);
 
+    // C++ JVM Code do less checks on public elements
     public static void patch(Map<String, byte[]> zip) {
         for (Map.Entry<String, byte[]> entry:zip.entrySet()) {
             if (((entry.getKey().startsWith("net/minecraft/server/") ||
