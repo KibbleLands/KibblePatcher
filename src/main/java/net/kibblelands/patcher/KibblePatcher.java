@@ -330,10 +330,6 @@ public class KibblePatcher implements Opcodes {
         fileOutputStream.write(origBytes);
         fileOutputStream.flush();
         fileOutputStream.close();
-        logger.info("Finished!\n");
-        if (this.yatopiaMode) {
-            return;
-        }
         if (isYatopiaPatched) {
             logger.info("Generic optimiser: Skipped");
         } else {
@@ -344,6 +340,10 @@ public class KibblePatcher implements Opcodes {
             if (externalPatches) {
                 logger.info("  Optimised forEach: " + stats[6]);
             }
+        }
+        logger.info("Finished!\n");
+        if (this.yatopiaMode) {
+            return;
         }
         logger.info("Server patcher: ");
         logger.info("  Compatibility patches: "+stats[3]);
