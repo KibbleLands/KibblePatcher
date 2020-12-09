@@ -57,6 +57,11 @@ public class PluginRewriteOptimiser implements Opcodes {
         insnNodes.add(new LdcInsnNode("cos"));
         insnNodes.add(new MethodInsnNode(INVOKEVIRTUAL,
                 "java/lang/String", "equals", "(Ljava/lang/Object;)Z"));
+        insnNodes.add(new JumpInsnNode(IFNE, nameMatch));
+        insnNodes.add(new VarInsnNode(ALOAD, 3));
+        insnNodes.add(new LdcInsnNode("tan"));
+        insnNodes.add(new MethodInsnNode(INVOKEVIRTUAL,
+                "java/lang/String", "equals", "(Ljava/lang/Object;)Z"));
         insnNodes.add(new JumpInsnNode(IFEQ, skip));
         insnNodes.add(nameMatch);
         // owner = "net/kibblelands/server/FastMath"

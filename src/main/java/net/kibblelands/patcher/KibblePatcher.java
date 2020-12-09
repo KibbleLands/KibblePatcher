@@ -229,7 +229,7 @@ public class KibblePatcher implements Opcodes {
                 ClassNode classNode = new ClassNode();
                 new ClassReader(FastMathAPI).accept(classNode, 0);
                 for (MethodNode methodNode : classNode.methods) {
-                    if (!methodNode.name.startsWith("<")) {
+                    if (!methodNode.name.startsWith("<") && !methodNode.name.equals("tan")) {
                         methodNode.instructions.clear();
                         boolean d2f = methodNode.desc.indexOf('D') != -1;
                         if (d2f) {
@@ -623,7 +623,7 @@ public class KibblePatcher implements Opcodes {
                         @Override
                         public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
                             if (opcode == INVOKESTATIC && (owner.equals("java/lang/Math") || owner.equals("java/lang/StrictMath"))) {
-                                if (Math != null && (name.equals("sin") || name.equals("cos"))) {
+                                if (Math != null && (name.equals("sin") || name.equals("cos") || name.equals("tan"))) {
                                     owner = Math;
                                     stats[1]++;
                                     if (descriptor.endsWith(")D")) {
@@ -633,7 +633,9 @@ public class KibblePatcher implements Opcodes {
                                         requireCalc_dontOptimise[0] = true;
                                         return;
                                     }
-                                } else if (owner.equals("java/lang/Math") && (name.equals("sqrt") || name.equals("sin") || name.equals("cos") || name.equals("asin") || name.equals("acos"))) {
+                                } else if (owner.equals("java/lang/Math") && (name.equals("sqrt") ||
+                                        name.equals("sin") || name.equals("cos") || name.equals("tan")
+                                        || name.equals("asin") || name.equals("acos") || name.equals("atan"))) {
                                     owner = "java/lang/StrictMath";
                                     stats[1]++;
                                 }

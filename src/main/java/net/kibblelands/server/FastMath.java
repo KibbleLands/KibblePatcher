@@ -22,4 +22,12 @@ public final class FastMath {
     public static float cos(float value) {
         return (float) StrictMath.cos(value);
     }
+
+    public static double tan(double value) {
+        return sin(value) / cos(value);
+    }
+
+    public static float tan(float value) {
+        return sin(value) / cos(value);
+    }
 }
