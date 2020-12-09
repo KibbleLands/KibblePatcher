@@ -140,7 +140,7 @@ public class KibblePatcher implements Opcodes {
         ClassDataProvider classDataProvider = new ClassDataProvider(KibblePatcher.class.getClassLoader());
         classDataProvider.addClasses(srv);
         System.gc(); // Clean memory
-        logger.info("Pawtching jar..."); //////////////////////////////////////////////////////////////
+        logger.info("Patching jar..."); //////////////////////////////////////////////////////////////
         int[] stats = {0, 0, 0, 0, 0, 0, 0};
         // Patch Manifest
         manifest.getMainAttributes().putValue(this.yatopiaMode ? "Kibble-Yatopia" : "Kibble-Version", KIBBLE_VERSION);
