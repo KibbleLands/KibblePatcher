@@ -10,3 +10,4 @@ gradle-app.setting
 *.iws
 # Don't push private testing
 /src/test/java/priv/
+/KibblePatcher.jar

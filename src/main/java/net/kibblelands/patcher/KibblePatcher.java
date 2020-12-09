@@ -38,7 +38,7 @@ public class KibblePatcher implements Opcodes {
     private static final String BUKKIT_VERSION_COMMAND = "org/bukkit/command/defaults/VersionCommand.class";
     private static final String PAPER_JVM_CHECKER_OLD = "com/destroystokyo/paper/util/PaperJvmChecker.class";
     private static final String PAPER_JVM_CHECKER = "io/papermc/paper/util/PaperJvmChecker.class";
-    private static final String KIBBLE_VERSION = "1.2";
+    private static final String KIBBLE_VERSION = "1.3";
     /**
      * KillSwitch for compatibility patches
      * Can be disabled if your server doesn't require it
@@ -220,12 +220,6 @@ public class KibblePatcher implements Opcodes {
                         readResource("javax/xml/bind/annotation/adapters/XmlAdapter.class"));
                 inject.put("javax/xml/bind/annotation/adapters/HexBinaryAdapter.class",
                         readResource("javax/xml/bind/annotation/adapters/HexBinaryAdapter.class"));
-            }
-            if (!srv.containsKey("sun/misc/BASE64Decoder.class")) {
-                inject.put("sun/misc/BASE64Decoder.class",
-                        readResource("sun/misc/BASE64Decoder.class"));
-                inject.put("sun/misc/BASE64Encoder.class",
-                        readResource("sun/misc/BASE64Encoder.class"));
             }
         }
         if (!this.yatopiaMode) {
