@@ -250,11 +250,11 @@ public class BiomeConfigAPIFeature implements Opcodes {
             b2n.add(new InsnNode(SWAP));
             b2n.add(new InsnNode(DUP));
             b2n.add(new FieldInsnNode(GETFIELD, API_BIOME_MUSIC,
-                    "minDeleay", "I"));
+                    "minDelay", "I"));
             b2n.add(new InsnNode(SWAP));
             b2n.add(new InsnNode(DUP));
             b2n.add(new FieldInsnNode(GETFIELD, API_BIOME_MUSIC,
-                    "maxDeleay", "I"));
+                    "maxDelay", "I"));
             b2n.add(new InsnNode(SWAP));
             b2n.add(new FieldInsnNode(GETFIELD, API_BIOME_MUSIC,
                     "replace", "Z"));
