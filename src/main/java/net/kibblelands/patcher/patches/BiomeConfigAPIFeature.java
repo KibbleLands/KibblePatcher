@@ -21,10 +21,12 @@ public class BiomeConfigAPIFeature implements Opcodes {
     private static final String BUKKIT_SOUND = "org/bukkit/Sound";
     private static final String API_BIOME_CONFIG = "net/kibblelands/server/biome/BiomeConfig";
     private static final String API_BIOME_PARTICLES = "net/kibblelands/server/biome/BiomeParticles";
+    private static final String API_BIOME_MUSIC = "net/kibblelands/server/biome/BiomeMusic";
     private static final String NMS_BIOME_BASE = "net/minecraft/server/$NMS/BiomeBase";
     private static final String NMS_BIOME_FOG = "net/minecraft/server/$NMS/BiomeFog";
     private static final String NMS_BIOME_PARTICLES = "net/minecraft/server/$NMS/BiomeParticles";
     private static final String NMS_SOUND_EFFECT = "net/minecraft/server/$NMS/SoundEffect";
+    private static final String NMS_MUSIC = "net/minecraft/server/$NMS/Music";
     private static final String NMS_PARTICLES_PARAM = "net/minecraft/server/$NMS/ParticleParam";
     private static final String NMS_CRAFT_BLOCK = "org/bukkit/craftbukkit/$NMS/block/CraftBlock";
     private static final String NMS_CRAFT_WORLD = "org/bukkit/craftbukkit/$NMS/CraftWorld";
@@ -37,6 +39,7 @@ public class BiomeConfigAPIFeature implements Opcodes {
 
     private static final String[] biomeApiClasses = new String[]{
             "net/kibblelands/server/biome/BiomeConfig.class",
+            "net/kibblelands/server/biome/BiomeMusic.class",
             "net/kibblelands/server/biome/BiomeParticles.class",
     };
 
@@ -65,19 +68,19 @@ public class BiomeConfigAPIFeature implements Opcodes {
             return;
         }
         InsnList insnNodes = ASMUtils.copyInsnList(setBiome.instructions);
-        AbstractInsnNode end = insnNodes.getFirst();
-        while (!isB2BBInsn(end, CRAFT_BLOCK)) {
-            if (end instanceof VarInsnNode && ((VarInsnNode) end).var == 4) {
-                ((VarInsnNode) end).var = 1;
+        AbstractInsnNode endInsn = insnNodes.getFirst();
+        while (!isB2BBInsn(endInsn, CRAFT_BLOCK)) {
+            if (endInsn instanceof VarInsnNode && ((VarInsnNode) endInsn).var == 4) {
+                ((VarInsnNode) endInsn).var = 1;
             }
-            end = end.getNext();
-            if (end == null) {
+            endInsn = endInsn.getNext();
+            if (endInsn == null) {
                 System.out.println("WTF? Err 0x01");
                 return;
             }
         }
-        while (end.getNext() != null) {
-            insnNodes.remove(end.getNext());
+        while (endInsn.getNext() != null) {
+            insnNodes.remove(endInsn.getNext());
         }
         insnNodes.add(new InsnNode(DUP));
         insnNodes.add(new VarInsnNode(ALOAD, 1));
@@ -139,8 +142,17 @@ public class BiomeConfigAPIFeature implements Opcodes {
             System.out.println("WTF? Err 0x02");
             return;
         }
-        addObjectMethods(biomeBase, biomeFogField, BIOME_FOG,
-                biomeParticle, API_BIOME_PARTICLES, "BiomeParticles", b2n -> {
+        FieldNode biomeParticleParam = ASMUtils.findFieldByDesc(biomeParticlesCL, "L" + PARTICLES_PARAM + ";");
+        if (biomeParticleParam == null) {
+            System.out.println("WTF? Err 0x04");
+            return;
+        }
+        FieldNode biomeParticleFrequency = ASMUtils.findFieldByDesc(biomeParticlesCL, "F");
+        if (biomeParticleFrequency == null) {
+            System.out.println("WTF? Err 0x05");
+            return;
+        }
+        addObjectMethods(biomeBase, biomeFogField, BIOME_FOG, biomeParticle, API_BIOME_PARTICLES, "BiomeParticles", b2n -> {
             b2n.add(new InsnNode(DUP));
             b2n.add(new FieldInsnNode(GETFIELD, API_BIOME_PARTICLES, "particle", "L" + BUKKIT_PARTICLE + ";"));
             b2n.add(new InsnNode(SWAP));
@@ -161,11 +173,35 @@ public class BiomeConfigAPIFeature implements Opcodes {
             b2n.add(new InsnNode(SWAP));
             b2n.add(new FieldInsnNode(PUTFIELD, BIOME_PARTICLE,
                     "kibbleBiomeParticles", "L" + API_BIOME_PARTICLES + ";"));
-                }, n2b -> {
-            // TODO: Conversion if kibbleBiomeParticles is null
+        }, n2b -> {
+            n2b.add(new InsnNode(DUP));
             n2b.add(new FieldInsnNode(GETFIELD, BIOME_PARTICLE,
                     "kibbleBiomeParticles", "L" + API_BIOME_PARTICLES + ";"));
-                });
+            n2b.add(new InsnNode(DUP));
+            LabelNode cached = new LabelNode();
+            n2b.add(new JumpInsnNode(IFNONNULL, cached));
+            n2b.add(new InsnNode(POP));
+            n2b.add(new InsnNode(DUP));
+            n2b.add(new FieldInsnNode(GETFIELD, BIOME_PARTICLE,
+                    biomeParticleParam.name, "L" + PARTICLES_PARAM + ";"));
+            n2b.add(new MethodInsnNode(INVOKESTATIC, CRAFT_PARTICLE, "toBukkit",
+                    "(L" + PARTICLES_PARAM + ";)L" + BUKKIT_PARTICLE + ";"));
+            n2b.add(new InsnNode(SWAP));
+            n2b.add(new FieldInsnNode(GETFIELD, BIOME_PARTICLE,
+                    biomeParticleFrequency.name, "F"));
+            n2b.add(new TypeInsnNode(NEW, API_BIOME_PARTICLES));
+            n2b.add(new InsnNode(DUP_X2));
+            n2b.add(new InsnNode(DUP_X2));
+            n2b.add(new InsnNode(POP));
+            n2b.add(new MethodInsnNode(INVOKESPECIAL,
+                    API_BIOME_PARTICLES, "<init>", "(L" + PARTICLES_PARAM + ";F)V"));
+            LabelNode end = new LabelNode();
+            n2b.add(new JumpInsnNode(GOTO, end));
+            n2b.add(cached);
+            n2b.add(new InsnNode(SWAP));
+            n2b.add(new InsnNode(POP));
+            n2b.add(end);
+        });
         // AmbientSound Methods
         String CRAFT_SOUND = NMS_CRAFT_SOUND.replace("$NMS", NMS);
         String SOUND_EFFECT = NMS_SOUND_EFFECT.replace("$NMS", NMS);
@@ -175,12 +211,78 @@ public class BiomeConfigAPIFeature implements Opcodes {
             wtf(NMS, "0x03");
             return;
         }
-        addObjectMethods(biomeBase, biomeFogField, BIOME_FOG,
-                ambientSound, BUKKIT_SOUND, "AmbientSound",
+        addObjectMethods(biomeBase, biomeFogField, BIOME_FOG, ambientSound, BUKKIT_SOUND, "AmbientSound",
                 b2n -> b2n.add(new MethodInsnNode(INVOKESTATIC, CRAFT_SOUND, "getSoundEffect",
                         "(L" + BUKKIT_SOUND + ";)L"+SOUND_EFFECT+";")),
                 n2b -> n2b.add(new MethodInsnNode(INVOKESTATIC, CRAFT_SOUND, "getBukkit",
                         "(L" + SOUND_EFFECT + ";)L"+BUKKIT_SOUND+";")));
+        // BiomeMusic Methods
+        String MUSIC = NMS_MUSIC.replace("$NMS", NMS);
+        FieldNode biomeMusic = ASMUtils.findFieldBySignature(biomeFog,
+                "Ljava/util/Optional<L" + MUSIC + ";>;");
+        if (biomeMusic == null) {
+            wtf(NMS, "0x06");
+            return;
+        }
+        ClassNode musicCL = new ClassNode();
+        new ClassReader(map.get(MUSIC+".class")).accept(musicCL, 0);
+        FieldNode musicSoundEffect = ASMUtils.findFieldByDesc(musicCL, "L" + SOUND_EFFECT + ";");
+        if (musicSoundEffect == null) {
+            wtf(NMS, "0x07");
+            return;
+        }
+        FieldNode minDeleay = ASMUtils.findFieldByDescIndex(musicCL, "I", 0);
+        FieldNode maxDeleay = ASMUtils.findFieldByDescIndex(musicCL, "I", 1);
+        FieldNode replace = ASMUtils.findFieldByDesc(musicCL, "Z");
+        if (minDeleay == null || maxDeleay == null || replace == null) {
+            wtf(NMS, "0x08");
+            return;
+        }
+        addObjectMethods(biomeBase, biomeFogField, BIOME_FOG, biomeMusic, API_BIOME_MUSIC, "BiomeMusic", b2n -> {
+            b2n.add(new TypeInsnNode(NEW, MUSIC));
+            b2n.add(new InsnNode(DUP_X1));
+            b2n.add(new InsnNode(SWAP));
+            b2n.add(new InsnNode(DUP));
+            b2n.add(new FieldInsnNode(GETFIELD, API_BIOME_MUSIC,
+                    "sound", "L" + BUKKIT_SOUND + ";"));
+            b2n.add(new MethodInsnNode(INVOKESTATIC, CRAFT_SOUND, "getSoundEffect",
+                    "(L" + BUKKIT_SOUND + ";)L"+SOUND_EFFECT+";"));
+            b2n.add(new InsnNode(SWAP));
+            b2n.add(new InsnNode(DUP));
+            b2n.add(new FieldInsnNode(GETFIELD, API_BIOME_MUSIC,
+                    "minDeleay", "I"));
+            b2n.add(new InsnNode(SWAP));
+            b2n.add(new InsnNode(DUP));
+            b2n.add(new FieldInsnNode(GETFIELD, API_BIOME_MUSIC,
+                    "maxDeleay", "I"));
+            b2n.add(new InsnNode(SWAP));
+            b2n.add(new FieldInsnNode(GETFIELD, API_BIOME_MUSIC,
+                    "replace", "Z"));
+            b2n.add(new MethodInsnNode(INVOKESPECIAL,
+                    MUSIC, "<init>", "(L" + SOUND_EFFECT + ";IIZ)V"));
+        }, n2b -> {
+            n2b.add(new TypeInsnNode(NEW, API_BIOME_MUSIC));
+            n2b.add(new InsnNode(DUP_X1));
+            n2b.add(new InsnNode(SWAP));
+            n2b.add(new InsnNode(DUP));
+            n2b.add(new FieldInsnNode(GETFIELD, MUSIC,
+                    musicSoundEffect.name, "L" + SOUND_EFFECT + ";"));
+            n2b.add(new MethodInsnNode(INVOKESTATIC, CRAFT_SOUND, "getBukkit",
+                    "(L" + SOUND_EFFECT + ";)L"+BUKKIT_SOUND+";"));
+            n2b.add(new InsnNode(SWAP));
+            n2b.add(new InsnNode(DUP));
+            n2b.add(new FieldInsnNode(GETFIELD, MUSIC,
+                    minDeleay.name, "I"));
+            n2b.add(new InsnNode(SWAP));
+            n2b.add(new InsnNode(DUP));
+            n2b.add(new FieldInsnNode(GETFIELD, MUSIC,
+                    maxDeleay.name, "I"));
+            n2b.add(new InsnNode(SWAP));
+            n2b.add(new FieldInsnNode(GETFIELD, MUSIC,
+                    replace.name, "Z"));
+            n2b.add(new MethodInsnNode(INVOKESPECIAL,
+                    API_BIOME_MUSIC, "<init>", "(L" + BUKKIT_SOUND + ";IIZ)V"));
+        });
         // Finish setup
         classWriter = new ClassWriter(0);
         biomeParticlesCL.accept(classWriter);

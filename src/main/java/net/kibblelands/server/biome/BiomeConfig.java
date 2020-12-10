@@ -14,6 +14,10 @@ public interface BiomeConfig {
 
     void setAmbientSound(Sound sound);
 
+    BiomeMusic getBiomeMusic();
+
+    void setBiomeMusic(BiomeMusic music);
+
     int getFogColor();
 
     void setFogColor(int fogColor);

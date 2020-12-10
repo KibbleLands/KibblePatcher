@@ -81,6 +81,28 @@ public class ASMUtils implements Opcodes {
         return null;
     }
 
+    public static FieldNode findFieldByDesc(ClassNode classNode,String desc) {
+        for (FieldNode fieldNode:classNode.fields) {
+            if ((!fieldNode.name.startsWith("<")) && desc.equals(fieldNode.desc)) {
+                return fieldNode;
+            }
+        }
+        return null;
+    }
+
+    public static FieldNode findFieldByDescIndex(ClassNode classNode,String desc,int index) {
+        for (FieldNode fieldNode:classNode.fields) {
+            if ((!fieldNode.name.startsWith("<")) && desc.equals(fieldNode.desc)) {
+                if (index == 0) {
+                    return fieldNode;
+                } else {
+                    index--;
+                }
+            }
+        }
+        return null;
+    }
+
     public static void setOpcode(AbstractInsnNode insnNode,int opcode) {
         ASMTreeAccessHelper.setOpcode(insnNode, opcode);
     }
