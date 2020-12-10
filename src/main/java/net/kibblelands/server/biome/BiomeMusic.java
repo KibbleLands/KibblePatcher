@@ -22,8 +22,8 @@ public final class BiomeMusic {
         if (this.maxDelay < 0) {
             throw new IllegalArgumentException("maxDelay must be positive (Found: "+minDelay+")");
         }
-        if (this.minDelay < this.maxDelay) {
-            throw new IllegalArgumentException("minDelay must be less or equals to maxDelay ("+minDelay +" > "+maxDelay+")");
+        if (this.minDelay > this.maxDelay) {
+            throw new IllegalArgumentException("minDelay must be lesser or equals to maxDelay ("+minDelay +" > "+maxDelay+")");
         }
     }
 
