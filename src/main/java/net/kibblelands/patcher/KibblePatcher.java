@@ -334,7 +334,7 @@ public class KibblePatcher implements Opcodes {
             logger.info("Generic optimiser: Skipped");
         } else {
             logger.info("Generic optimiser: ");
-            logger.info("  Inlined calls: " + stats[0]);
+            //logger.info("  Inlined calls: " + stats[0]); Useless
             logger.info("  Optimised java calls: " + stats[1]);
             logger.info("  Optimised opcodes: " + stats[2]);
             if (externalPatches) {
@@ -633,18 +633,8 @@ public class KibblePatcher implements Opcodes {
                                         requireCalc_dontOptimise[0] = true;
                                         return;
                                     }
-                                } else if (owner.equals("java/lang/Math") && (name.equals("sqrt") ||
-                                        name.equals("sin") || name.equals("cos") || name.equals("tan")
-                                        || name.equals("asin") || name.equals("acos") || name.equals("atan"))) {
-                                    owner = "java/lang/StrictMath";
-                                    stats[1]++;
                                 }
-                                if (!inline0(this, opcode, owner, name, descriptor, isInterface)) {
-                                    super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
-                                } else {
-                                    stats[0]++;
-                                    requireCalc_dontOptimise[0] = true;
-                                }
+                                super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
                                 return;
                             } else if (opcode == INVOKEVIRTUAL && owner.equals("java/lang/String") &&
                                     name.equals("replace") && descriptor.contains("CharSequence")) {
@@ -735,109 +725,6 @@ public class KibblePatcher implements Opcodes {
             index++;
         }
         p.setValue(stringBuilder.toString().getBytes(StandardCharsets.UTF_8));
-    }
-
-    private static boolean inline0(MethodVisitor methodVisitor, int opcode, String owner, String name, String descriptor, boolean isInterface) {
-        if (!owner.equals("java/lang/Math") && !owner.equals("java/lang/StrictMath")) {
-            return false;
-        }
-        if (descriptor.indexOf('I') != -1) {
-            switch (name) {
-                default:
-                    return false;
-                case "abs": {
-                    Label label = new Label();
-                    methodVisitor.visitInsn(DUP);
-                    methodVisitor.visitJumpInsn(IFGE, label);
-                    methodVisitor.visitInsn(INEG);
-                    methodVisitor.visitLabel(label);
-                    break;
-                }
-                case "max": {
-                    Label label = new Label();
-                    methodVisitor.visitInsn(DUP2);
-                    methodVisitor.visitJumpInsn(IF_ICMPGE, label);
-                    methodVisitor.visitInsn(SWAP);
-                    methodVisitor.visitLabel(label);
-                    methodVisitor.visitInsn(POP);
-                    break;
-                }
-                case "min": {
-                    Label label = new Label();
-                    methodVisitor.visitInsn(DUP2);
-                    methodVisitor.visitJumpInsn(IF_ICMPLE, label);
-                    methodVisitor.visitInsn(SWAP);
-                    methodVisitor.visitLabel(label);
-                    methodVisitor.visitInsn(POP);
-                    break;
-                }
-            }
-        } else if (descriptor.indexOf('D') != -1) {
-            switch (name) {
-                default:
-                    return false;
-                case "toRadians":
-                    methodVisitor.visitLdcInsn(180D);
-                    methodVisitor.visitInsn(DDIV);
-                    methodVisitor.visitLdcInsn(Math.PI);
-                    methodVisitor.visitInsn(DMUL);
-                    break;
-                case "toDegrees":
-                    methodVisitor.visitLdcInsn(180D);
-                    methodVisitor.visitInsn(DMUL);
-                    methodVisitor.visitLdcInsn(Math.PI);
-                    methodVisitor.visitInsn(DDIV);
-                    break;
-                case "abs": {
-                    Label label = new Label();
-                    methodVisitor.visitInsn(DUP2);
-                    methodVisitor.visitInsn(DCONST_0);
-                    methodVisitor.visitInsn(DCMPG);
-                    methodVisitor.visitJumpInsn(IFGE, label);
-                    methodVisitor.visitInsn(DNEG);
-                    methodVisitor.visitLabel(label);
-                    break;
-                }
-            }
-        } else if (descriptor.indexOf('F') != -1) {
-            switch (name) {
-                default:
-                    return false;
-                case "abs": {
-                    Label label = new Label();
-                    methodVisitor.visitInsn(DUP);
-                    methodVisitor.visitInsn(FCONST_0);
-                    methodVisitor.visitInsn(FCMPG);
-                    methodVisitor.visitJumpInsn(IFGE, label);
-                    methodVisitor.visitInsn(FNEG);
-                    methodVisitor.visitLabel(label);
-                    break;
-                }
-                case "max": {
-                    Label label = new Label();
-                    methodVisitor.visitInsn(DUP2);
-                    methodVisitor.visitInsn(FCMPL);
-                    methodVisitor.visitJumpInsn(IFGE, label);
-                    methodVisitor.visitInsn(SWAP);
-                    methodVisitor.visitLabel(label);
-                    methodVisitor.visitInsn(POP);
-                    break;
-                }
-                case "min": {
-                    Label label = new Label();
-                    methodVisitor.visitInsn(DUP2);
-                    methodVisitor.visitInsn(FCMPL);
-                    methodVisitor.visitJumpInsn(IFLE, label);
-                    methodVisitor.visitInsn(SWAP);
-                    methodVisitor.visitLabel(label);
-                    methodVisitor.visitInsn(POP);
-                    break;
-                }
-            }
-        } else {
-            return false;
-        }
-        return true;
     }
 
     public Logger getLogger() {
