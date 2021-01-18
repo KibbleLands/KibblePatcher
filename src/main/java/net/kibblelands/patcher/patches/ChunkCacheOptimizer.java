@@ -47,10 +47,15 @@ public class ChunkCacheOptimizer implements Opcodes {
         InsnNode int4 = new InsnNode(ICONST_4);
         IntInsnNode int31 = new IntInsnNode(BIPUSH, 31);
         IntInsnNode int32 = new IntInsnNode(BIPUSH, 32);
-        stats[4]+= ASMUtils.replaceInstruction(methodNode, int3, int31);
-        stats[4]+= ASMUtils.replaceInstruction(methodNode2, int4, int32);
-        stats[4]+= ASMUtils.replaceInstruction(methodNode3, int4, int32);
-        stats[4]+= ASMUtils.replaceInstruction(methodNode4, int4, int32);
+        int opts = 0;
+        opts += ASMUtils.replaceInstruction(methodNode, int3, int31);
+        opts += ASMUtils.replaceInstruction(methodNode2, int4, int32);
+        opts += ASMUtils.replaceInstruction(methodNode3, int4, int32);
+        opts += ASMUtils.replaceInstruction(methodNode4, int4, int32);
+        if (opts != 4) {
+            return;
+        }
+        stats[4] += 1;
         ClassWriter classWriter = new ClassWriter(0);
         classNode.accept(classWriter);
         map.put(CHUNK_PROVIDER_RESOLVED, classWriter.toByteArray());

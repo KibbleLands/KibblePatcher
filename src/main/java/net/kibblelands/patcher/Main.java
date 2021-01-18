@@ -9,10 +9,23 @@ public class Main {
     private static final Logger LOGGER = new Logger("KibblePatcher");
 
     public static void main(String[] args) throws IOException {
-        boolean yatopiaMode = false;
-        if (args.length == 3 && "-yatopia".equals(args[0])) {
+        boolean builtInMode = false;
+        boolean builtInModeRewrite = false;
+        String builtInPkg = null;
+        if (args.length == 4 && ("-builtin-has-rewrite".equals(args[0]) ||
+                (builtInModeRewrite = "-builtin".equals(args[0])))) {
+            args = new String[]{args[2], args[3]};
+            builtInMode = true;
+            builtInPkg = args[1];
+        }
+        // Kept for backward compatibility reasons
+        // Shortcut for -builtin-has-rewrite org/yatopiamc/yatopia/server/util/
+        if (args.length == 3 && ("-yatopia".equals(args[0]))) {
+            LOGGER.warn("The \"-yatopia\" argument is deprecated and will be removed in a future release!");
+            LOGGER.warn("Please use \"-builtin-has-rewrite org/yatopiamc/yatopia/server/util/\" instead.");
             args = new String[]{args[1], args[2]};
-            yatopiaMode = true;
+            builtInMode = true;
+            builtInPkg = "org/yatopiamc/yatopia/server/util/";
         }
         if (args.length != 2) {
             LOGGER.stdout("Usage: \n" +
@@ -28,10 +41,12 @@ public class Main {
             return;
         }
         KibblePatcher kibblePatcher = new KibblePatcher(LOGGER);
-        if (yatopiaMode) {
+        if (builtInMode) {
             kibblePatcher.compatibilityPatches = false;
             kibblePatcher.featuresPatches = false;
-            kibblePatcher.yatopiaMode = true;
+            kibblePatcher.builtInMode = true;
+            kibblePatcher.builtInPkg = builtInPkg;
+            kibblePatcher.builtInModeRewrite = builtInModeRewrite;
         }
         kibblePatcher.patchServerJar(in, new File(args[1]));
         System.exit(0);

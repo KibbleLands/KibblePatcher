@@ -1,21 +1,17 @@
 package net.kibblelands.patcher.utils.logger;
 
 import net.kibblelands.patcher.utils.ConsoleColors;
-import org.fusesource.jansi.AnsiOutputStream;
-import org.fusesource.jansi.WindowsAnsiProcessor;
+import org.fusesource.jansi.AnsiConsole;
 
-import java.io.OutputStream;
 import java.io.PrintStream;
 
 public class Logger {
     static {
         try {
-            OutputStream outputStream = System.out;
             if (System.getProperty("os.name").toLowerCase().contains("win")) {
-                outputStream = new AnsiOutputStream(outputStream,
-                        new WindowsAnsiProcessor(outputStream, true), "UTF-8");
+                AnsiConsole.systemInstall();
             }
-            System.setOut(new PrintStream(outputStream, true, "UTF-8"));
+            System.setOut(new PrintStream(System.out, true, "UTF-8"));
         } catch (Exception ignored) {}
     }
 

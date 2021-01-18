@@ -10,7 +10,7 @@ import java.security.SecureClassLoader;
 import java.util.*;
 
 import static net.kibblelands.patcher.utils.ASMUtils.ASM_BUILD;
-import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
+import static org.objectweb.asm.Opcodes.*;
 
 public class ClassDataProvider {
     private static final ClassLoader BOOTSTRAP_CLASS_LOADER = new SecureClassLoader(null) {};
@@ -144,7 +144,7 @@ public class ClassDataProvider {
             ClassData[] classData = new ClassData[interfaces.size()];
             int i = 0;
             for (String inName:interfaces) {
-                classData[i] = getClassData(inName);
+                classData[i] = getClassData(inName, true);
                 i++;
             }
             return classData;
@@ -203,6 +203,10 @@ public class ClassDataProvider {
     }
 
     public ClData getClassData(String clName) {
+        return this.getClassData(clName, false);
+    }
+
+    private ClData getClassData(String clName,boolean defaultToInterface) {
         if (clName.endsWith(";")) {
             throw new IllegalArgumentException("Can't put desc as class Data -> "+clName);
         }
@@ -242,6 +246,9 @@ public class ClassDataProvider {
                 }
             } catch (Exception e2) {
                 clData.superClass = "java/lang/Object";
+                if (defaultToInterface) {
+                    clData.access |= ACC_INTERFACE | ACC_ABSTRACT;
+                }
             }
         }
         clDataHashMap.put(clName,clData);

@@ -38,7 +38,7 @@ public class KibblePatcher implements Opcodes {
     private static final String BUKKIT_VERSION_COMMAND = "org/bukkit/command/defaults/VersionCommand.class";
     private static final String PAPER_JVM_CHECKER_OLD = "com/destroystokyo/paper/util/PaperJvmChecker.class";
     private static final String PAPER_JVM_CHECKER = "io/papermc/paper/util/PaperJvmChecker.class";
-    private static final String KIBBLE_VERSION = "1.3";
+    private static final String KIBBLE_VERSION = "1.4";
     /**
      * KillSwitch for compatibility patches
      * Can be disabled if your server doesn't require it
@@ -55,10 +55,18 @@ public class KibblePatcher implements Opcodes {
      */
     public boolean featuresPatches = true;
     /**
-     * Special mode for the YatopiaMC build process
-     * https://github.com/YatopiaMC/Yatopia
+     * Special mode for servers build process
+     * to only include KibblePatcher optimisations
      */
-    public boolean yatopiaMode = false;
+    public boolean builtInMode = false;
+    /**
+     * Flag to tell if
+     */
+    public boolean builtInModeRewrite = false;
+    /**
+     * Prefix of FastMath and FastReplace classes
+     */
+    public String builtInPkg = "net/kibblelands/server/";
 
     public void patchServerJar(File in, File out) throws IOException {
         String paperVer = PaperClipSupport.getPaperClipMCVer(in);
@@ -98,7 +106,9 @@ public class KibblePatcher implements Opcodes {
             System.exit(4);
             return;
         }
-        boolean isYatopiaPatched = (!this.yatopiaMode) &&
+        boolean isBuiltInPatched = (!this.builtInMode) &&
+                manifest.getMainAttributes().containsKey("Kibble-BuiltIn") ||
+                // Kept for backward compatibility reasons
                 manifest.getMainAttributes().containsKey("Kibble-Yatopia");
         String StringUtil = null;
         if (srv.containsKey("org/apache/commons/lang/StringUtils.class")) {
@@ -119,8 +129,8 @@ public class KibblePatcher implements Opcodes {
         }
         if (compatibilityPatches && !javaZipMitigation && MathHelper == null
                 && srv.get(CRAFT_BUKKIT_MAIN) == null && srv.get(BUKKIT_API) != null) {
-            if (this.yatopiaMode) {
-                throw new Error("Yatopia mode is incompatible with library patching!");
+            if (this.builtInMode) {
+                throw new Error("BuiltIn mode is incompatible with library patching!");
             }
             logger.warn("API Patching mode! (Optimisations disabled)");
             logger.warn("Warning: API Patching mode is not officially supported!");
@@ -143,11 +153,14 @@ public class KibblePatcher implements Opcodes {
         logger.info("Pawtching jar..."); //////////////////////////////////////////////////////////////
         int[] stats = {0, 0, 0, 0, 0, 0, 0};
         // Patch Manifest
-        manifest.getMainAttributes().putValue(this.yatopiaMode ? "Kibble-Yatopia" : "Kibble-Version", KIBBLE_VERSION);
+        manifest.getMainAttributes().putValue(this.builtInMode ? "Kibble-BuiltIn" : "Kibble-Version", KIBBLE_VERSION);
         final boolean[] plRewrite = new boolean[]{false};
-        if (this.yatopiaMode) {
+        if (this.builtInMode) {
             if (!libraryMode) {
                 BlockDataOptimiser.patch(srv, MathHelper, stats);
+                if (this.builtInModeRewrite) {
+                    PluginRewriteOptimiser.patch(srv, MathHelper, plRewrite);
+                }
                 NMSAccessOptimizer.patch(srv);
             }
         } else if (!libraryMode) {
@@ -188,7 +201,7 @@ public class KibblePatcher implements Opcodes {
             BookCrashFixer.patch(srv, MathHelper, stats);
             AuthenticationHardening.patch(srv, MathHelper, stats);
             // Specific optimisations
-            if (!isYatopiaPatched) {
+            if (!isBuiltInPatched) {
                 ChunkCacheOptimizer.patch(srv, MathHelper, stats);
                 MethodResultCacheOptimizer.patch(srv, MathHelper, stats);
                 BlockDataOptimiser.patch(srv, MathHelper, stats);
@@ -203,7 +216,7 @@ public class KibblePatcher implements Opcodes {
             }
             // Save in the jar if plugin rewrite is supported/installed
             manifest.getMainAttributes().putValue("Kibble-Rewrite",
-                    isYatopiaPatched?"BUILT-IN":plRewrite[0]?"INSTALLED":"UNSUPPORTED");
+                    isBuiltInPatched?"BUILT-IN":plRewrite[0]?"INSTALLED":"UNSUPPORTED");
         } else {
             // Add features in lib mode
             if (featuresPatches) {
@@ -222,7 +235,8 @@ public class KibblePatcher implements Opcodes {
                         readResource("javax/xml/bind/annotation/adapters/HexBinaryAdapter.class"));
             }
         }
-        if (!this.yatopiaMode) {
+        if (((!this.builtInMode) || this.builtInPkg.equals("net/kibblelands/server/"))
+                && !(isBuiltInPatched && srv.containsKey("net/kibblelands/server/FastMath.class"))) {
             byte[] FastMathAPI = readResource("net/kibblelands/server/FastMath.class");
             byte[] FastReplaceAPI = readResource("net/kibblelands/server/FastReplace.class");
             if (!libraryMode) { // Mirror FastMath to MathHelper
@@ -288,17 +302,17 @@ public class KibblePatcher implements Opcodes {
         // Optimise all classes
         srv.values().removeIf(Objects::isNull); // Clean null elements
         if (!libraryMode) {
-            if (!isYatopiaPatched) {
+            if (!isBuiltInPatched) {
                 for (Map.Entry<String, byte[]> entry : srv.entrySet()) {
                     if (entry.getKey().endsWith(".class")) {
                         patchClassOpt(entry, classDataProvider, entry.getKey().startsWith("org/apache/commons/math3/") ||
-                                entry.getKey().startsWith("net/minecraft/server/") ? null : MathHelper, stats, isYatopiaPatched);
+                                entry.getKey().startsWith("net/minecraft/server/") ? null : MathHelper, stats, isBuiltInPatched);
                     } else if (entry.getKey().equals("pack.mcmeta") || entry.getKey().endsWith(".json")) {
                         trimJSON(entry);
                     }
                 }
             }
-            if (!this.yatopiaMode) {
+            if (!this.builtInMode) {
                 // Patch default config for performance
                 if (srv.get("configurations/bukkit.yml") != null) {
                     srv.put("configurations/bukkit.yml", new String(srv.get("configurations/bukkit.yml"), StandardCharsets.UTF_8)
@@ -308,7 +322,7 @@ public class KibblePatcher implements Opcodes {
                 }
             }
             // Get stats in final jar
-            manifest.getMainAttributes().putValue(this.yatopiaMode ? "Kibble-Yatopia-Stats" : "Kibble-Stats", Arrays.toString(stats));
+            manifest.getMainAttributes().putValue(this.builtInMode ? "Kibble-BuiltIn-Stats" : "Kibble-Stats", Arrays.toString(stats));
         }
         orig = null;
         srv = null;
@@ -330,7 +344,18 @@ public class KibblePatcher implements Opcodes {
         fileOutputStream.write(origBytes);
         fileOutputStream.flush();
         fileOutputStream.close();
-        if (isYatopiaPatched) {
+        logger.info("Finished!\n");
+        if (!this.builtInMode) {
+            logger.info("Server patcher: ");
+            logger.info("  Compatibility patches: "+stats[3]);
+            logger.info("  Optimisations patches: "+stats[4]);
+            logger.info("  Security patches: "+stats[5]);
+            logger.info("  Plugin rewrite: "+(isBuiltInPatched?
+                    (ConsoleColors.CYAN + "BUILT-IN"):plRewrite[0]?
+                    (ConsoleColors.CYAN + "INSTALLED"):
+                    (ConsoleColors.YELLOW + "UNSUPPORTED")));
+        }
+        if (isBuiltInPatched) {
             logger.info("Generic optimiser: Skipped");
         } else {
             logger.info("Generic optimiser: ");
@@ -341,18 +366,6 @@ public class KibblePatcher implements Opcodes {
                 logger.info("  Optimised forEach: " + stats[6]);
             }
         }
-        logger.info("Finished!\n");
-        if (this.yatopiaMode) {
-            return;
-        }
-        logger.info("Server patcher: ");
-        logger.info("  Compatibility patches: "+stats[3]);
-        logger.info("  Optimisations patches: "+stats[4]);
-        logger.info("  Security patches: "+stats[5]);
-        logger.info("  Plugin rewrite: "+(isYatopiaPatched?
-                (ConsoleColors.CYAN + "BUILT-IN"):plRewrite[0]?
-                (ConsoleColors.CYAN + "INSTALLED"):
-                (ConsoleColors.YELLOW + "UNSUPPORTED")));
     }
 
     public static Map<String,byte[]> readZIP(final InputStream in) throws IOException {
@@ -440,7 +453,7 @@ public class KibblePatcher implements Opcodes {
         in.close();
     }
 
-    public static byte[] patchDelayer(byte[] bytes) throws IOException {
+    public static byte[] patchDelayer(byte[] bytes) {
         ClassReader classReader = new ClassReader(bytes);
         ClassWriter classWriter = new ClassWriter(0);
         classReader.accept(new ClassVisitor(ASM_BUILD, classWriter) {
@@ -477,7 +490,7 @@ public class KibblePatcher implements Opcodes {
         return classWriter.toByteArray();
     }
 
-    public static byte[] patchPaperJavaWarning(byte[] bytes) throws IOException {
+    public static byte[] patchPaperJavaWarning(byte[] bytes) {
         ClassReader classReader = new ClassReader(bytes);
         ClassNode classNode = new ClassNode();
         classReader.accept(classNode, 0);
@@ -496,7 +509,7 @@ public class KibblePatcher implements Opcodes {
         return classWriter.toByteArray();
     }
 
-    public static byte[] patchBrand(byte[] bytes) throws IOException {
+    public static byte[] patchBrand(byte[] bytes) {
         if (bytes == null) return null;
         ClassReader classReader = new ClassReader(bytes);
         ClassWriter classWriter = new ClassWriter(0);
@@ -534,7 +547,7 @@ public class KibblePatcher implements Opcodes {
         return classWriter.toByteArray();
     }
 
-    public static byte[] patchVersionCmd(byte[] bytes) throws IOException {
+    public static byte[] patchVersionCmd(byte[] bytes) {
         if (bytes == null) return null;
         ClassReader classReader = new ClassReader(bytes);
         ClassWriter classWriter = new ClassWriter(0);
@@ -558,7 +571,7 @@ public class KibblePatcher implements Opcodes {
         return classWriter.toByteArray();
     }
 
-    public static byte[] patchGC(byte[] bytes,String method,final int[] stats) throws IOException {
+    public static byte[] patchGC(byte[] bytes,String method,final int[] stats) {
         if (bytes == null) return null;
         ClassReader classReader = new ClassReader(bytes);
         ClassWriter classWriter = new ClassWriter(0);
@@ -584,15 +597,15 @@ public class KibblePatcher implements Opcodes {
     }
 
     public void patchClassOpt(Map.Entry<String, byte[]> p,ClassDataProvider cdp,
-                              String Math,final int[] stats,final boolean isYatopia) throws IOException {
-        patchClassOpt(p, cdp, Math, stats, isYatopia, false);
+                              String Math,final int[] stats,final boolean isBuiltIn) throws IOException {
+        patchClassOpt(p, cdp, Math, stats, isBuiltIn, false);
     }
 
     private static final String replaceDesc =
             "(Ljava/lang/String;Ljava/lang/CharSequence;Ljava/lang/CharSequence;)Ljava/lang/String;";
 
     private void patchClassOpt(final Map.Entry<String, byte[]> p,ClassDataProvider cdp,
-                               String Math, final int[] stats,final boolean isYatopia,final boolean err) throws IOException {
+                               String Math, final int[] stats,final boolean isBuiltIn,final boolean err) throws IOException {
         boolean[] requireCalc_dontOptimise = new boolean[]{false, false};
         ClassReader classReader = new ClassReader(p.getValue());
         ClassNode classNode = new ClassNode();
@@ -601,7 +614,7 @@ public class KibblePatcher implements Opcodes {
             ForEachRemover.transform(classNode, cdp, stats);
         }
         ClassWriter classWriter = err ? new ClassWriter(0) : cdp.newClassWriter();
-        if (isYatopia) { // Don't optimise if Yatopia based server
+        if (isBuiltIn) { // Don't optimise if Yatopia based server
             classNode.accept(classWriter);
             requireCalc_dontOptimise[1] = (classNode.version < V1_6 && !classNode.name.startsWith("net/minecraft/server/")
                     && !(classNode.name.startsWith("org/bukkit/") && !classNode.name.startsWith("org/bukkit/craftbukkit/libs/")));
@@ -639,8 +652,8 @@ public class KibblePatcher implements Opcodes {
                             } else if (opcode == INVOKEVIRTUAL && owner.equals("java/lang/String") &&
                                     name.equals("replace") && descriptor.contains("CharSequence")) {
                                 opcode = INVOKESTATIC;
-                                owner = KibblePatcher.this.yatopiaMode ?
-                                        "org/yatopiamc/yatopia/server/util/FastReplace" :
+                                owner = KibblePatcher.this.builtInMode ?
+                                        (KibblePatcher.this.builtInPkg + "FastReplace") :
                                         "net/kibblelands/server/FastReplace";
                                 descriptor = replaceDesc;
                                 stats[1]++;
@@ -675,7 +688,7 @@ public class KibblePatcher implements Opcodes {
                                 super.visitMaxs(maxStack, maxLocals);
                             } catch (Throwable t) {
                                 try {
-                                    patchClassOpt(p, cdp, Math, stats, isYatopia, true);
+                                    patchClassOpt(p, cdp, Math, stats, isBuiltIn, true);
                                 } catch (IOException ignored) {}
                                 throw new RuntimeException("Malformed method at "+p.getKey()+"#"+m_name+m_descriptor, t);
                             }
@@ -687,7 +700,7 @@ public class KibblePatcher implements Opcodes {
         }
     }
 
-    public static void trimJSON(Map.Entry<String, byte[]> p) throws IOException {
+    public static void trimJSON(Map.Entry<String, byte[]> p) {
         byte[] bytes = p.getValue();
         String str = new String(bytes, StandardCharsets.UTF_8);
         StringBuilder stringBuilder = new StringBuilder();

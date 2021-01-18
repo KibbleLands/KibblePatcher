@@ -52,6 +52,10 @@ public class BookCrashFixer implements Opcodes {
                     || ((VarInsnNode) insnNode).var != 0) {
                 getItem.insert(insnNode.clone(null));
                 insnNode = insnNode.getPrevious();
+                if (insnNode == null) {
+                    wtf(NMS, "NullPreviousInstruction");
+                    return;
+                }
             }
             getItem.insert(new VarInsnNode(ALOAD, 0));
             break;

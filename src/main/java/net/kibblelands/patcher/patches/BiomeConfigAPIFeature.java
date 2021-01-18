@@ -22,12 +22,14 @@ public class BiomeConfigAPIFeature implements Opcodes {
     private static final String API_BIOME_CONFIG = "net/kibblelands/server/biome/BiomeConfig";
     private static final String API_BIOME_PARTICLES = "net/kibblelands/server/biome/BiomeParticles";
     private static final String API_BIOME_MUSIC = "net/kibblelands/server/biome/BiomeMusic";
+    private static final String API_GRASS_COLOR_MODIFIER = "net/kibblelands/server/biome/GrassColorModifier";
     private static final String NMS_BIOME_BASE = "net/minecraft/server/$NMS/BiomeBase";
     private static final String NMS_BIOME_FOG = "net/minecraft/server/$NMS/BiomeFog";
     private static final String NMS_BIOME_PARTICLES = "net/minecraft/server/$NMS/BiomeParticles";
     private static final String NMS_SOUND_EFFECT = "net/minecraft/server/$NMS/SoundEffect";
     private static final String NMS_MUSIC = "net/minecraft/server/$NMS/Music";
     private static final String NMS_PARTICLES_PARAM = "net/minecraft/server/$NMS/ParticleParam";
+    private static final String NMS_GRASS_COLOR = "net/minecraft/server/$NMS/BiomeFog$GrassColor";
     private static final String NMS_CRAFT_BLOCK = "org/bukkit/craftbukkit/$NMS/block/CraftBlock";
     private static final String NMS_CRAFT_WORLD = "org/bukkit/craftbukkit/$NMS/CraftWorld";
     private static final String NMS_CRAFT_PARTICLE = "org/bukkit/craftbukkit/$NMS/CraftParticle";
@@ -41,6 +43,7 @@ public class BiomeConfigAPIFeature implements Opcodes {
             "net/kibblelands/server/biome/BiomeConfig.class",
             "net/kibblelands/server/biome/BiomeMusic.class",
             "net/kibblelands/server/biome/BiomeParticles.class",
+            "net/kibblelands/server/biome/GrassColorModifier.class",
     };
 
     private static final String[] intElements = new String[]{
@@ -60,6 +63,7 @@ public class BiomeConfigAPIFeature implements Opcodes {
         String BIOME_FOG = NMS_BIOME_FOG.replace("$NMS", NMS);
         String CRAFT_BLOCK = NMS_CRAFT_BLOCK.replace("$NMS", NMS);
         String CRAFT_WORLD = NMS_CRAFT_WORLD.replace("$NMS", NMS);
+        String GRASS_COLOR = NMS_GRASS_COLOR.replace("$NMS", NMS);
         ClassNode craftWorldNode = new ClassNode();
         new ClassReader(map.get(CRAFT_WORLD+".class")).accept(craftWorldNode, 0);
         MethodNode setBiome = ASMUtils.findMethod(craftWorldNode, "setBiome", "(IIIL"+BUKKIT_BIOME+";)V");
@@ -142,7 +146,8 @@ public class BiomeConfigAPIFeature implements Opcodes {
             System.out.println("WTF? Err 0x02");
             return;
         }
-        FieldNode biomeParticleParam = ASMUtils.findFieldByDesc(biomeParticlesCL, "L" + PARTICLES_PARAM + ";");
+        FieldNode biomeParticleParam = ASMUtils
+                .findFieldByTypeOrOptional(biomeParticlesCL, PARTICLES_PARAM);
         if (biomeParticleParam == null) {
             System.out.println("WTF? Err 0x04");
             return;
@@ -205,8 +210,8 @@ public class BiomeConfigAPIFeature implements Opcodes {
         // AmbientSound Methods
         String CRAFT_SOUND = NMS_CRAFT_SOUND.replace("$NMS", NMS);
         String SOUND_EFFECT = NMS_SOUND_EFFECT.replace("$NMS", NMS);
-        FieldNode ambientSound = ASMUtils.findFieldBySignature(biomeFog,
-                "Ljava/util/Optional<L" + SOUND_EFFECT + ";>;");
+        FieldNode ambientSound = ASMUtils
+                .findFieldByTypeOrOptional(biomeFog, SOUND_EFFECT);
         if (ambientSound == null) {
             wtf(NMS, "0x03");
             return;
@@ -218,8 +223,8 @@ public class BiomeConfigAPIFeature implements Opcodes {
                         "(L" + SOUND_EFFECT + ";)L"+BUKKIT_SOUND+";")));
         // BiomeMusic Methods
         String MUSIC = NMS_MUSIC.replace("$NMS", NMS);
-        FieldNode biomeMusic = ASMUtils.findFieldBySignature(biomeFog,
-                "Ljava/util/Optional<L" + MUSIC + ";>;");
+        FieldNode biomeMusic = ASMUtils
+                .findFieldByTypeOrOptional(biomeFog, MUSIC);
         if (biomeMusic == null) {
             wtf(NMS, "0x06");
             return;
@@ -283,6 +288,14 @@ public class BiomeConfigAPIFeature implements Opcodes {
             n2b.add(new MethodInsnNode(INVOKESPECIAL,
                     API_BIOME_MUSIC, "<init>", "(L" + BUKKIT_SOUND + ";IIZ)V"));
         });
+        FieldNode grassColorAccessor = ASMUtils
+                .findFieldByTypeOrOptional(biomeFog, GRASS_COLOR);
+        if (grassColorAccessor == null) {
+            wtf(NMS, "0x09");
+            return;
+        }
+        addEnumMethods(biomeBase, biomeFogField, BIOME_FOG,
+                grassColorAccessor, API_GRASS_COLOR_MODIFIER, "GrassColorModifier");
         // Finish setup
         classWriter = new ClassWriter(0);
         biomeParticlesCL.accept(classWriter);
@@ -359,6 +372,22 @@ public class BiomeConfigAPIFeature implements Opcodes {
         classNode.methods.add(setter);
     }
 
+    private static void addEnumMethods(ClassNode classNode, FieldNode biomeFogAccess,
+                                         String BIOME_FOG, FieldNode accessor, String bType, String name) {
+        boolean optional = accessor.signature != null && accessor.signature.startsWith("Ljava/util/Optional<L");
+        String nmsType = optional ?
+                accessor.signature.substring(21, accessor.signature.length()-3)
+                : accessor.desc.substring(1, accessor.desc.length() - 1);
+        addObjectMethods(classNode, biomeFogAccess, BIOME_FOG, accessor, bType, name,
+                b2n -> {
+            b2n.add(new MethodInsnNode(INVOKEVIRTUAL, bType, "name", "()Ljava/lang/String;"));
+            b2n.add(new MethodInsnNode(INVOKESTATIC, nmsType, "valueOf", "(Ljava/lang/String;)L" + nmsType + ";"));
+                }, n2b -> {
+            n2b.add(new MethodInsnNode(INVOKEVIRTUAL, nmsType, "name", "()Ljava/lang/String;"));
+            n2b.add(new MethodInsnNode(INVOKESTATIC, bType, "valueOf", "(Ljava/lang/String;)L" + bType + ";"));
+                });
+    }
+
     private static void addObjectMethods(ClassNode classNode, FieldNode biomeFogAccess,
                                          String BIOME_FOG, FieldNode accessor, String bType, String name,
                                          Consumer<InsnList> b2n,Consumer<InsnList> n2b) {
@@ -421,13 +450,13 @@ public class BiomeConfigAPIFeature implements Opcodes {
                 setter.instructions.add(new JumpInsnNode(GOTO, end));
                 setter.instructions.add(empty);
                 setter.instructions.add(new InsnNode(POP));
-                setter.instructions.add(new InsnNode(ACONST_NULL));
+                setter.instructions.add(new MethodInsnNode(INVOKESTATIC,
+                        "java/util/Optional", "empty", "()Ljava/util/Optional;"));
             } else {
                 setter.instructions.add(new JumpInsnNode(GOTO, end));
                 setter.instructions.add(empty);
                 setter.instructions.add(new InsnNode(POP));
-                setter.instructions.add(new MethodInsnNode(INVOKESTATIC,
-                        "java/util/Optional", "empty", "()Ljava/util/Optional;"));
+                setter.instructions.add(new InsnNode(ACONST_NULL));
             }
             setter.instructions.add(end);
             setter.instructions.add(new FieldInsnNode(PUTFIELD,
@@ -474,7 +503,7 @@ public class BiomeConfigAPIFeature implements Opcodes {
     }
 
     private static void wtf(String NMS, String state) {
-        System.out.println("An feature installation has failed in an unexpected way. please report the issue with your server jar!");
+        System.out.println("A feature installation has failed in an unexpected way. please report the issue with your server jar!");
         System.out.println("NMS: "+NMS);
         System.out.println("Debug state: "+ state);
     }

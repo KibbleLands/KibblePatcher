@@ -41,4 +41,8 @@ public interface BiomeConfig {
     int getGrassColor();
 
     void setGrassColor(int fogColor);
+
+    GrassColorModifier getGrassColorModifier();
+
+    void setGrassColorModifier(GrassColorModifier grassColorModifier);
 }

@@ -81,6 +81,11 @@ public class ASMUtils implements Opcodes {
         return null;
     }
 
+    public static FieldNode findFieldByTypeOrOptional(ClassNode classNode,String type) {
+        FieldNode fieldNode = findFieldBySignature(classNode, "Ljava/util/Optional<L" + type + ";>;");
+        return fieldNode != null ? fieldNode : findFieldByDesc(classNode, "L" + type + ";");
+    }
+
     public static FieldNode findFieldByDesc(ClassNode classNode,String desc) {
         for (FieldNode fieldNode:classNode.fields) {
             if ((!fieldNode.name.startsWith("<")) && desc.equals(fieldNode.desc)) {

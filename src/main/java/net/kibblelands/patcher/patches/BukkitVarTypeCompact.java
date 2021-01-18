@@ -158,6 +158,8 @@ public class BukkitVarTypeCompact implements Opcodes {
                             methodNode.access | ACC_SYNTHETIC, methodNode.name,
                             methodNode.desc.substring(0, methodNode.desc.length() - 3)
                                     + (i2d ? "I)V": "D)V"), null, null);
+                    if (ASMUtils.hasMethod(classNode,
+                            newMethodNode.name, newMethodNode.desc)) continue;
                     newMethodNode.instructions.add(new VarInsnNode(ALOAD, 0));
                     int i = 1;
                     for (Type arg : Type.getArgumentTypes(newMethodNode.desc)) {
