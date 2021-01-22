@@ -21,6 +21,7 @@ import java.util.jar.Attributes;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipException;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
@@ -38,7 +39,7 @@ public class KibblePatcher implements Opcodes {
     private static final String BUKKIT_VERSION_COMMAND = "org/bukkit/command/defaults/VersionCommand.class";
     private static final String PAPER_JVM_CHECKER_OLD = "com/destroystokyo/paper/util/PaperJvmChecker.class";
     private static final String PAPER_JVM_CHECKER = "io/papermc/paper/util/PaperJvmChecker.class";
-    private static final String KIBBLE_VERSION = "1.4";
+    private static final String KIBBLE_VERSION = "1.4.1";
     /**
      * KillSwitch for compatibility patches
      * Can be disabled if your server doesn't require it
@@ -426,7 +427,16 @@ public class KibblePatcher implements Opcodes {
             }
             entry.setMethod(ZipOutputStream.DEFLATED);
             if (entry.isDirectory()) {
-                zip.putNextEntry(entry);
+                // Yatopia can have duplicate dir entries
+                try {
+                    zip.putNextEntry(entry);
+                } catch (ZipException zipException) {
+                    if (!zipException.getMessage().startsWith("duplicate entry: ")) {
+                        throw zipException;
+                    } else {
+                        continue;
+                    }
+                }
             } else {
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 int nRead;

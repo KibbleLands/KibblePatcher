@@ -95,7 +95,7 @@ public class BookCrashFixer implements Opcodes {
     }
 
     private static void wtf(String NMS, String state) {
-        System.out.println("An optimisation has failed in an unexpected way. please report the issue with your server jar!");
+        System.out.println("An security patch has failed in an unexpected way. please report the issue with your server jar!");
         System.out.println("NMS: "+NMS);
         System.out.println("Debug state: "+ state);
     }
