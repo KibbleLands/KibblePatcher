@@ -1,6 +1,8 @@
 package net.kibblelands.patcher.patches;
 
+import net.kibblelands.patcher.CommonGenerator;
 import net.kibblelands.patcher.utils.ASMUtils;
+import net.kibblelands.patcher.utils.ConsoleColors;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
@@ -12,8 +14,8 @@ public class InventoryCompact implements Opcodes {
     private static final String INVENTORY = "org/bukkit/inventory/Inventory.class";
     private static final String CUSTOM_INVENTORY = "org/bukkit/craftbukkit/$NMS/inventory/CraftInventoryCustom.class";
 
-    public static void check(Map<String, byte[]> map, String mth,final int[] stats) {
-        String NMS = mth.substring(21, mth.lastIndexOf('/'));
+    public static void check(CommonGenerator commonGenerator,Map<String, byte[]> map, final int[] stats) {
+        String NMS = commonGenerator.getNMS();
         byte[] inv = map.get(INVENTORY);
         ClassReader classReader = new ClassReader(inv);
         ClassNode classNode = new ClassNode();
@@ -54,6 +56,7 @@ public class InventoryCompact implements Opcodes {
         classWriter = new ClassWriter(0);
         classNode.accept(classWriter);
         map.put(CUSTOM_INVENTORY.replace("$NMS", NMS), classWriter.toByteArray());
+        commonGenerator.addChangeEntry("Added back the Inventory getName/getTitle API " + ConsoleColors.CYAN + "(Retro compatibility)");
         stats[3]++;
     }
 }

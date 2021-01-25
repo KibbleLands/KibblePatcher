@@ -1,6 +1,8 @@
 package net.kibblelands.patcher.patches;
 
+import net.kibblelands.patcher.CommonGenerator;
 import net.kibblelands.patcher.utils.ASMUtils;
+import net.kibblelands.patcher.utils.ConsoleColors;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
@@ -21,7 +23,7 @@ public class GuavaVarTypeCompact implements Opcodes {
     private static final String CACHE =
             "com/google/common/cache/Cache.class";
 
-    public static void check(Map<String, byte[]> map, String mth, final int[] stats) {
+    public static void check(CommonGenerator commonGenerator,Map<String, byte[]> map, final int[] stats) {
         boolean didWork = false;
         if (map.get("com/google/common/cache/LoadingCache.class") != null) {
             byte[] cacheBuilder = map.get(CACHE_BUILDER);
@@ -77,6 +79,7 @@ public class GuavaVarTypeCompact implements Opcodes {
             didWork = true;
         }
         if (didWork) {
+            commonGenerator.addChangeEntry("Added mirrors of old methods in Guava lib " + ConsoleColors.CYAN + "(Retro compatibility)");
             stats[3]++;
         }
     }

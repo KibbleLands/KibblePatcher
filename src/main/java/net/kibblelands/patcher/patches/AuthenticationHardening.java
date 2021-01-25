@@ -1,6 +1,8 @@
 package net.kibblelands.patcher.patches;
 
+import net.kibblelands.patcher.CommonGenerator;
 import net.kibblelands.patcher.utils.ASMUtils;
+import net.kibblelands.patcher.utils.ConsoleColors;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
@@ -16,8 +18,8 @@ public class AuthenticationHardening implements Opcodes {
     private static final String INVALID_DATA_TRANSLATE_KEY = "multiplayer.disconnect.unexpected_query_response";
     private static final String INVALID_DATA_MESSAGE = "Unexpected custom data from client";
 
-    public static void patch(Map<String, byte[]> map, String mth, final int[] stats) {
-        String NMS = mth.substring(21, mth.lastIndexOf('/'));
+    public static void patch(CommonGenerator commonGenerator, Map<String, byte[]> map, final int[] stats) {
+        String NMS = commonGenerator.getNMS();
         String loginListener = LOGIN_LISTENER.replace("$NMS", NMS);
         String authPacket = PACKET_AUTH.replace("$NMS", NMS);
         String baseComponent = BASE_COMPONENT.replace("$NMS", NMS);
@@ -74,6 +76,7 @@ public class AuthenticationHardening implements Opcodes {
         ClassWriter classWriter = new ClassWriter(0);
         classNode.accept(classWriter);
         map.put(loginListenerCL, classWriter.toByteArray());
+        commonGenerator.addChangeEntry("Hardened online mode authentication. " + ConsoleColors.CYAN + "(Security)");
         stats[5]++;
     }
 }

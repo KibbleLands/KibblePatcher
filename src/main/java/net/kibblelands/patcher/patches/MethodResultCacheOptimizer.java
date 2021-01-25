@@ -1,6 +1,8 @@
 package net.kibblelands.patcher.patches;
 
+import net.kibblelands.patcher.CommonGenerator;
 import net.kibblelands.patcher.utils.ASMUtils;
+import net.kibblelands.patcher.utils.ConsoleColors;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
@@ -11,8 +13,8 @@ import java.util.Map;
 public class MethodResultCacheOptimizer implements Opcodes {
     private static final String FURNACE_TILE = "net/minecraft/server/$NMS/TileEntityFurnace.class";
 
-    public static void patch(Map<String, byte[]> map, String mth, final int[] stats) {
-        String NMS = mth.substring(21, mth.lastIndexOf('/'));
+    public static void patch(CommonGenerator commonGenerator,Map<String, byte[]> map, final int[] stats) {
+        String NMS = commonGenerator.getNMS();
         byte[] bytes = map.get(FURNACE_TILE.replace("$NMS", NMS));
         if (bytes != null) {
             ClassNode classNode = new ClassNode();
@@ -25,6 +27,7 @@ public class MethodResultCacheOptimizer implements Opcodes {
             ClassWriter classWriter = new ClassWriter(0);
             classNode.accept(classWriter);
             map.put(FURNACE_TILE.replace("$NMS", NMS), classWriter.toByteArray());
+            commonGenerator.addChangeEntry("Cached furnace fuel list " + ConsoleColors.CYAN + "(Optimisation)");
         }
     }
 

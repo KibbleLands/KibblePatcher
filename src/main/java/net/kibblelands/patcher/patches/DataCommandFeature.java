@@ -1,6 +1,8 @@
 package net.kibblelands.patcher.patches;
 
+import net.kibblelands.patcher.CommonGenerator;
 import net.kibblelands.patcher.utils.ASMUtils;
+import net.kibblelands.patcher.utils.ConsoleColors;
 import org.objectweb.asm.*;
 
 import java.util.Map;
@@ -9,10 +11,11 @@ public class DataCommandFeature implements Opcodes {
     private static final String dataAccessorEntity = "net/minecraft/server/$NMS/CommandDataAccessorEntity.class";
     private static final String entityHuman = "net/minecraft/server/$NMS/EntityHuman";
 
-    public static void install(Map<String, byte[]> map, String mth, final int[] stats) {
-        String NMS = mth.substring(21, mth.lastIndexOf('/'));
+    public static void install(CommonGenerator commonGenerator,Map<String, byte[]> map, final int[] stats) {
+        String NMS = commonGenerator.getNMS();
         String resolvedDataAccessorEntity = dataAccessorEntity.replace("$NMS", NMS);
         byte[] dataAccessorEntity = map.get(resolvedDataAccessorEntity);
+        final boolean[] didWork = new boolean[]{false};
         if (dataAccessorEntity == null) return; // Doesn't exists (Skip)
         final String asmEntityHuman = entityHuman.replace("$NMS", NMS);
         ClassWriter classWriter = new ClassWriter(0);
@@ -27,6 +30,7 @@ public class DataCommandFeature implements Opcodes {
                     public void visitTypeInsn(int opcode, String type) {
                         if (opcode == INSTANCEOF && type.equals(asmEntityHuman)) {
                             super.visitInsn(ICONST_0);
+                            didWork[0] = true;
                         } else {
                             super.visitTypeInsn(opcode, type);
                         }
@@ -34,6 +38,10 @@ public class DataCommandFeature implements Opcodes {
                 };
             }
         }, 0);
+        if (!didWork[0]) {
+            return;
+        }
         map.put(resolvedDataAccessorEntity, classWriter.toByteArray());
+        commonGenerator.addChangeEntry("Allow data write on players with the /data command. " + ConsoleColors.CYAN + "(Feature)");
     }
 }

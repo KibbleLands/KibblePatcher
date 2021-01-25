@@ -1,6 +1,8 @@
 package net.kibblelands.patcher.patches;
 
+import net.kibblelands.patcher.CommonGenerator;
 import net.kibblelands.patcher.utils.ASMUtils;
+import net.kibblelands.patcher.utils.ConsoleColors;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
@@ -15,7 +17,7 @@ public class BukkitVarTypeCompact implements Opcodes {
     private static final String DAMAGE_BLOCK = "org/bukkit/event/entity/EntityDamageByBlockEvent.class";
     private static final String DAMAGE_ENTITY = "org/bukkit/event/entity/EntityDamageByEntityEvent.class";
 
-    public static void check(Map<String, byte[]> map, String mth, final int[] stats) {
+    public static void check(CommonGenerator commonGenerator,Map<String, byte[]> map, final int[] stats) {
         boolean didWork = false;
         byte[] cache = map.get(DAMAGEABLE);
         ClassNode classNode = new ClassNode();
@@ -60,6 +62,7 @@ public class BukkitVarTypeCompact implements Opcodes {
             }
         }
         if (didWork) {
+            commonGenerator.addChangeEntry("Fixed HealthAPI int <-> double compatibility " + ConsoleColors.CYAN + "(Retro compatibility)");
             stats[3]++;
         }
     }

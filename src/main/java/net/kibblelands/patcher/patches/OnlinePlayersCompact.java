@@ -1,6 +1,8 @@
 package net.kibblelands.patcher.patches;
 
+import net.kibblelands.patcher.CommonGenerator;
 import net.kibblelands.patcher.utils.ASMUtils;
+import net.kibblelands.patcher.utils.ConsoleColors;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
@@ -15,13 +17,14 @@ public class OnlinePlayersCompact implements Opcodes {
     private static final String DESC_LEGACY = "()[Lorg/bukkit/entity/Player;";
     private static final String DESC_NEW = "()Ljava/util/Collection;";
 
-    public static void check(Map<String, byte[]> map, String mth, final int[] stats) {
+    public static void check(CommonGenerator commonGenerator,Map<String, byte[]> map, final int[] stats) {
         byte[] bukkit = map.get(BUKKIT);
+        boolean[] backport = new boolean[]{false};
         boolean didWork = false;
         ClassReader classReader = new ClassReader(bukkit);
         ClassNode classNode = new ClassNode();
         classReader.accept(classNode, 0);
-        if (doPatch(classNode, BUKKIT.replace(".class", ""), true)) {
+        if (doPatch(classNode, BUKKIT.replace(".class", ""), true, backport)) {
             ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
             classNode.accept(classWriter);
             map.put(BUKKIT, classWriter.toByteArray());
@@ -32,7 +35,7 @@ public class OnlinePlayersCompact implements Opcodes {
         classReader = new ClassReader(server);
         classNode = new ClassNode();
         classReader.accept(classNode, 0);
-        if (doPatch(classNode, SERVER.replace(".class", ""), false)) {
+        if (doPatch(classNode, SERVER.replace(".class", ""), false, backport)) {
             ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
             classNode.accept(classWriter);
             map.put(SERVER, classWriter.toByteArray());
@@ -40,11 +43,13 @@ public class OnlinePlayersCompact implements Opcodes {
         }
 
         if (didWork) {
+            commonGenerator.addChangeEntry((backport[0] ? "Ported back the recent" :
+                    "Added the old array based") + " getOnlinePlayers API " + ConsoleColors.CYAN + "(Retro Compatibility)");
             stats[3]++;
         }
     }
 
-    private static boolean doPatch(ClassNode classNode,String self,boolean isStatic) {
+    private static boolean doPatch(ClassNode classNode,String self,boolean isStatic,boolean[] backport) {
         if ((classNode.access & ACC_INTERFACE) != 0 && classNode.version < V1_8) { // For default in interface
             classNode.version = V1_8;
         }
@@ -76,6 +81,7 @@ public class OnlinePlayersCompact implements Opcodes {
             getOnlinePlayers.instructions.add(new TypeInsnNode(CHECKCAST, "java/util/Collection"));
             getOnlinePlayers.instructions.add(new InsnNode(ARETURN));
             classNode.methods.add(getOnlinePlayers);
+            backport[0] = true;
             return true;
         } else {
             return false;

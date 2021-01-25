@@ -1,8 +1,11 @@
 package net.kibblelands.patcher.patches;
 
+import net.kibblelands.patcher.CommonGenerator;
 import net.kibblelands.patcher.KibblePatcher;
 import net.kibblelands.patcher.rebuild.ClassDataProvider;
 import net.kibblelands.patcher.utils.ASMUtils;
+import net.kibblelands.patcher.utils.ConsoleColors;
+import net.kibblelands.patcher.utils.IOUtils;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
@@ -55,10 +58,10 @@ public class BiomeConfigAPIFeature implements Opcodes {
             "GrassColor",
     };
 
-    public static void install(Map<String, byte[]> map, Map<String, byte[]> inject,
-                               String mth, ClassDataProvider cdp, final int[] stats) throws IOException {
+    public static void install(CommonGenerator commonGenerator, Map<String, byte[]> map, Map<String, byte[]> inject,
+                               ClassDataProvider cdp, final int[] stats) throws IOException {
         if (!isSupported(map)) return; // Skip on pre 1.16.2
-        String NMS = mth.substring(21, mth.lastIndexOf('/'));
+        String NMS = commonGenerator.getNMS();
         String BIOME_BASE = NMS_BIOME_BASE.replace("$NMS", NMS);
         String BIOME_FOG = NMS_BIOME_FOG.replace("$NMS", NMS);
         String CRAFT_BLOCK = NMS_CRAFT_BLOCK.replace("$NMS", NMS);
@@ -308,6 +311,7 @@ public class BiomeConfigAPIFeature implements Opcodes {
         map.put(BIOME_FOG+".class", classWriter.toByteArray());
         map.put(CRAFT_WORLD+".class", newCraftWorld);
         installLib(map, inject);
+        commonGenerator.addChangeEntry("Added BiomeConfigAPI. " + ConsoleColors.CYAN + "(Feature)");
     }
 
     private static boolean isB2BBInsn(AbstractInsnNode abstractInsnNode,String craftBlock) {
@@ -469,7 +473,7 @@ public class BiomeConfigAPIFeature implements Opcodes {
     public static void installLib(Map<String, byte[]> map, Map<String, byte[]> inject) throws IOException {
         if (!isSupported(map)) return; // Skip on pre 1.16.2
         for (String file:biomeApiClasses) {
-            inject.put(file, KibblePatcher.readResource(file));
+            inject.put(file, IOUtils.readResource(file));
         }
         byte[] bytes = map.get(BUKKIT_BIOME+".class");
         ClassNode classNode = new ClassNode();

@@ -1,6 +1,8 @@
 package net.kibblelands.patcher.patches;
 
+import net.kibblelands.patcher.CommonGenerator;
 import net.kibblelands.patcher.utils.ASMUtils;
+import net.kibblelands.patcher.utils.ConsoleColors;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
@@ -15,8 +17,8 @@ import java.util.Map;
 public class ChunkCacheOptimizer implements Opcodes {
     private static final String CHUNK_PROVIDER = "net/minecraft/server/$NMS/ChunkProviderServer.class";
 
-    public static void patch(Map<String, byte[]> map, String mth, final int[] stats) {
-        String NMS = mth.substring(21, mth.lastIndexOf('/'));
+    public static void patch(CommonGenerator commonGenerator,Map<String, byte[]> map, final int[] stats) {
+        String NMS = commonGenerator.getNMS();
         String CHUNK_PROVIDER_RESOLVED = CHUNK_PROVIDER.replace("$NMS", NMS);
         if (map.get(CHUNK_PROVIDER_RESOLVED) == null) {
             return;
@@ -52,12 +54,14 @@ public class ChunkCacheOptimizer implements Opcodes {
         opts += ASMUtils.replaceInstruction(methodNode2, int4, int32);
         opts += ASMUtils.replaceInstruction(methodNode3, int4, int32);
         opts += ASMUtils.replaceInstruction(methodNode4, int4, int32);
-        if (opts != 4) {
+        if (opts != 5) {
+            System.out.println("X -> " + opts);
             return;
         }
         stats[4] += 1;
         ClassWriter classWriter = new ClassWriter(0);
         classNode.accept(classWriter);
         map.put(CHUNK_PROVIDER_RESOLVED, classWriter.toByteArray());
+        commonGenerator.addChangeEntry("Increased Chuck cache size. " + ConsoleColors.CYAN + "(Optimisation)");
     }
 }

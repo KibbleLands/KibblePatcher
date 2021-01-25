@@ -1,5 +1,7 @@
 package net.kibblelands.patcher.patches;
 
+import net.kibblelands.patcher.CommonGenerator;
+import net.kibblelands.patcher.utils.ConsoleColors;
 import org.objectweb.asm.*;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
@@ -14,8 +16,8 @@ public class BlockDataOptimiser implements Opcodes {
     private static final String NMS_BLOCK_DATA = "net/minecraft/server/$NMS/IBlockData";
 
     // Transform method call to field call to allow JIT to better optimise bytecode
-    public static void patch(Map<String, byte[]> map, String mth, final int[] stats) {
-        final String NMS = mth.substring(21, mth.lastIndexOf('/'));
+    public static void patch(CommonGenerator commonGenerator,Map<String, byte[]> map, final int[] stats) {
+        final String NMS = commonGenerator.getNMS();
         final String BLOCK = NMS_BLOCK.replace("$NMS", NMS);
         final String BLOCK_DATA = NMS_BLOCK_DATA.replace("$NMS", NMS);
         if (!map.containsKey(BLOCK_DATA+".class")) {
@@ -102,6 +104,7 @@ public class BlockDataOptimiser implements Opcodes {
                 entry.setValue(classWriter.toByteArray());
             }
         }
+        commonGenerator.addChangeEntry("Optimised BlockData access. " + ConsoleColors.CYAN + "(Optimisation)");
     }
 
     private static void wtf(String NMS, String state) {

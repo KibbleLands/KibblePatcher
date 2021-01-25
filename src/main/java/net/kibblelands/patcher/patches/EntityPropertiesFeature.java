@@ -1,6 +1,9 @@
 package net.kibblelands.patcher.patches;
 
+import net.kibblelands.patcher.CommonGenerator;
 import net.kibblelands.patcher.KibblePatcher;
+import net.kibblelands.patcher.utils.ConsoleColors;
+import net.kibblelands.patcher.utils.IOUtils;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
@@ -26,9 +29,9 @@ public class EntityPropertiesFeature implements Opcodes {
     private static final String getPropertiesArray = "#getPropertiesArrayImpl";
     private static final String getPropertiesArrayDesc = "(I)[Ljava/lang/Object;";
 
-    public static void install(Map<String, byte[]> map, Map<String, byte[]> inject,
-                               String mth, final int[] stats) throws IOException {
-        String NMS = mth.substring(21, mth.lastIndexOf('/'));
+    public static void install(CommonGenerator commonGenerator,Map<String, byte[]> map, Map<String, byte[]> inject,
+                               final int[] stats) throws IOException {
+        String NMS = commonGenerator.getNMS();
         ClassNode classNode = new ClassNode();
         new ClassReader(map.get(ENTITY)).accept(classNode,0);
         classNode.methods.add(new MethodNode(ACC_PUBLIC|ACC_ABSTRACT|ACC_SYNTHETIC,
@@ -81,7 +84,7 @@ public class EntityPropertiesFeature implements Opcodes {
                 classWriter.toByteArray());
         // Add PropertiesImpl
         classNode = new ClassNode();
-        new ClassReader(KibblePatcher.readResource(propertiesImpl)).accept(classNode,0);
+        new ClassReader(IOUtils.readResource(propertiesImpl)).accept(classNode,0);
         classNode.access |= ACC_SYNTHETIC;
         classNode.fields.clear();
         classNode.methods.clear();
@@ -100,14 +103,15 @@ public class EntityPropertiesFeature implements Opcodes {
                 classWriter.toByteArray());
         // Install lib
         for (String file:propertiesApiClasses) {
-            inject.put(file, KibblePatcher.readResource(file));
+            inject.put(file, IOUtils.readResource(file));
         }
+        commonGenerator.addChangeEntry("Added EntityPropertiesAPI " + ConsoleColors.CYAN + "(Feature)");
     }
 
     public static void installLib(Map<String, byte[]> map) throws IOException {
         // Default Impl for tests
         ClassNode classNode = new ClassNode();
-        new ClassReader(KibblePatcher.readResource(propertiesImpl)).accept(classNode,0);
+        new ClassReader(IOUtils.readResource(propertiesImpl)).accept(classNode,0);
         // Hide this to most dev tools to help beginners focus
         classNode.access |= ACC_SYNTHETIC;
         for (FieldNode fieldNode:classNode.fields) {
@@ -124,7 +128,7 @@ public class EntityPropertiesFeature implements Opcodes {
                 classWriter.toByteArray());
         // Install lib
         for (String file:propertiesApiClasses) {
-            map.put(file, KibblePatcher.readResource(file));
+            map.put(file, IOUtils.readResource(file));
         }
     }
 }

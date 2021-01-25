@@ -8,19 +8,19 @@ public final class FastMath {
     private FastMath() {}
 
     public static double sin(double value) {
-        return StrictMath.sin(value);
+        return Math.sin(value);
     }
 
     public static float sin(float value) {
-        return (float) StrictMath.sin(value);
+        return (float) Math.sin(value);
     }
 
     public static double cos(double value) {
-        return StrictMath.cos(value);
+        return Math.cos(value);
     }
 
     public static float cos(float value) {
-        return (float) StrictMath.cos(value);
+        return (float) Math.cos(value);
     }
 
     public static double tan(double value) {

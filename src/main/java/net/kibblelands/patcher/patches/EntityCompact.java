@@ -1,6 +1,8 @@
 package net.kibblelands.patcher.patches;
 
+import net.kibblelands.patcher.CommonGenerator;
 import net.kibblelands.patcher.utils.ASMUtils;
+import net.kibblelands.patcher.utils.ConsoleColors;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
@@ -12,7 +14,7 @@ import java.util.Map;
 public class EntityCompact implements Opcodes {
     private static final String VILLAGER_PROFESSION = "org/bukkit/entity/Villager$Profession.class";
 
-    public static void check(Map<String, byte[]> map, String mth, final int[] stats) {
+    public static void check(CommonGenerator commonGenerator,Map<String, byte[]> map, final int[] stats) {
         byte[] inv = map.get(VILLAGER_PROFESSION);
         ClassReader classReader = new ClassReader(inv);
         ClassNode classNode = new ClassNode();
@@ -30,5 +32,6 @@ public class EntityCompact implements Opcodes {
         classNode.accept(classWriter);
         map.put(VILLAGER_PROFESSION, classWriter.toByteArray());
         stats[3]++;
+        commonGenerator.addChangeEntry("Added Villager$Profession.isZombie() stub " + ConsoleColors.CYAN + "(Retro compatibility)");
     }
 }

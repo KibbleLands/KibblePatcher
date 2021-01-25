@@ -1,6 +1,8 @@
 package net.kibblelands.patcher.patches;
 
+import net.kibblelands.patcher.CommonGenerator;
 import net.kibblelands.patcher.utils.ASMUtils;
+import net.kibblelands.patcher.utils.ConsoleColors;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
@@ -11,8 +13,8 @@ import java.util.Map;
 public class PluginRewriteOptimiser implements Opcodes {
     private static final String COMMODORE_MV = "org/bukkit/craftbukkit/$NMS/util/Commodore$1$1.class";
 
-    public static void patch(Map<String, byte[]> map, String mth, final boolean[] plRewrite) {
-        String NMS = mth.substring(21, mth.lastIndexOf('/'));
+    public static void patch(CommonGenerator commonGenerator,Map<String, byte[]> map,String accessPkg, final boolean[] plRewrite) {
+        String NMS = commonGenerator.getNMS();
         String COMMODORE_MV = PluginRewriteOptimiser.COMMODORE_MV.replace("$NMS", NMS);
         byte[] methodVisitor = map.get(COMMODORE_MV);
         if (methodVisitor == null) {
@@ -65,7 +67,7 @@ public class PluginRewriteOptimiser implements Opcodes {
         insnNodes.add(new JumpInsnNode(IFEQ, skip));
         insnNodes.add(nameMatch);
         // owner = "net/kibblelands/server/FastMath"
-        insnNodes.add(new LdcInsnNode("net/kibblelands/server/FastMath"));
+        insnNodes.add(new LdcInsnNode(accessPkg + "FastMath"));
         insnNodes.add(new VarInsnNode(ASTORE, 2));
         // }
         insnNodes.add(new JumpInsnNode(GOTO, skip));
@@ -99,7 +101,7 @@ public class PluginRewriteOptimiser implements Opcodes {
         * */
         insnNodes.add(ASMUtils.getNumberInsn(INVOKESTATIC));
         insnNodes.add(new VarInsnNode(ISTORE, 1));
-        insnNodes.add(new LdcInsnNode("net/kibblelands/server/FastReplace"));
+        insnNodes.add(new LdcInsnNode(accessPkg + "FastReplace"));
         insnNodes.add(new VarInsnNode(ASTORE, 2));
         insnNodes.add(new LdcInsnNode(
                 "(Ljava/lang/String;Ljava/lang/CharSequence;Ljava/lang/CharSequence;)Ljava/lang/String;"));
@@ -112,5 +114,6 @@ public class PluginRewriteOptimiser implements Opcodes {
         classNode.accept(classWriter);
         map.put(COMMODORE_MV, classWriter.toByteArray());
         plRewrite[0] = true;
+        commonGenerator.addChangeEntry("Installed Plugin sin/cos/tan rewrite." + ConsoleColors.CYAN + " (Optimisation)");
     }
 }

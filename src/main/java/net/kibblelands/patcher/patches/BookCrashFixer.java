@@ -1,6 +1,8 @@
 package net.kibblelands.patcher.patches;
 
+import net.kibblelands.patcher.CommonGenerator;
 import net.kibblelands.patcher.utils.ASMUtils;
+import net.kibblelands.patcher.utils.ConsoleColors;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
@@ -17,8 +19,8 @@ public class BookCrashFixer implements Opcodes {
     private static final String NMS_ITEM_STACK = "net/minecraft/server/$NMS/ItemStack";
     private static final String WRITABLE_BOOK = "WRITABLE_BOOK";
 
-    public static void patch(Map<String, byte[]> map, String mth, final int[] stats) {
-        final String NMS = mth.substring(21, mth.lastIndexOf('/'));
+    public static void patch(CommonGenerator commonGenerator,Map<String, byte[]> map, final int[] stats) {
+        final String NMS = commonGenerator.getNMS();
         if (map.containsKey(NMS_PACKED_BOOK_EDIT.replace("$NMS", NMS))) {
             return; // The bug has already been patched
         }
@@ -91,11 +93,12 @@ public class BookCrashFixer implements Opcodes {
         ClassWriter classWriter = new ClassWriter(0);
         classNode.accept(classWriter);
         map.put(PLAYER_CONNECTION+".class", classWriter.toByteArray());
+        commonGenerator.addChangeEntry("Added mitigation against the BookCrashExploit " + ConsoleColors.CYAN + "(Security)");
         stats[5]++;
     }
 
     private static void wtf(String NMS, String state) {
-        System.out.println("An security patch has failed in an unexpected way. please report the issue with your server jar!");
+        System.out.println("A security patch has failed in an unexpected way. please report the issue with your server jar!");
         System.out.println("NMS: "+NMS);
         System.out.println("Debug state: "+ state);
     }

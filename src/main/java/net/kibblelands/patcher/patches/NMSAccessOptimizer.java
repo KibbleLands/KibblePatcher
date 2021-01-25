@@ -1,5 +1,7 @@
 package net.kibblelands.patcher.patches;
 
+import net.kibblelands.patcher.CommonGenerator;
+import net.kibblelands.patcher.utils.ConsoleColors;
 import org.objectweb.asm.*;
 
 import java.util.Map;
@@ -9,7 +11,7 @@ public class NMSAccessOptimizer implements Opcodes {
     private static final int MASK2 = ~(ACC_PRIVATE|ACC_PROTECTED);
 
     // C++ JVM Code do less checks on public elements
-    public static void patch(Map<String, byte[]> zip) {
+    public static void patch(CommonGenerator commonGenerator, Map<String, byte[]> zip) {
         for (Map.Entry<String, byte[]> entry:zip.entrySet()) {
             if (((entry.getKey().startsWith("net/minecraft/server/") ||
                     entry.getKey().startsWith("org/bukkit/craftbukkit/v"))
@@ -44,5 +46,6 @@ public class NMSAccessOptimizer implements Opcodes {
                 entry.setValue(classWriter.toByteArray());
             }
         }
+        commonGenerator.addChangeEntry("Reduced NMS Access restrictions " + ConsoleColors.CYAN + "(Optimisation)");
     }
 }
