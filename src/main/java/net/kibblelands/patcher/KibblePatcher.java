@@ -39,7 +39,7 @@ public class KibblePatcher implements Opcodes {
     private static final String BUKKIT_VERSION_COMMAND = "org/bukkit/command/defaults/VersionCommand.class";
     private static final String PAPER_JVM_CHECKER_OLD = "com/destroystokyo/paper/util/PaperJvmChecker.class";
     private static final String PAPER_JVM_CHECKER = "io/papermc/paper/util/PaperJvmChecker.class";
-    public static final String KIBBLE_VERSION = "1.5.0";
+    public static final String KIBBLE_VERSION = "1.5.1";
     /**
      * KillSwitch for compatibility patches
      * Can be disabled if your server doesn't require it
@@ -70,11 +70,11 @@ public class KibblePatcher implements Opcodes {
     public String builtInPkg = "net/kibblelands/server/";
 
     public void patchServerJar(File in, File out) throws IOException {
-        String paperVer = PaperClipSupport.getPaperClipMCVer(in);
-        if (paperVer != null) {
-            logger.info("Generating paperclip server...");
-            this.patchServerJar0(PaperClipSupport.patchPaperClip(in, paperVer), out);
-            PaperClipSupport.cleanPaperClip();
+        ServerClipSupport serverClipSupport = ServerClipSupport.getServerClipSupport(in);
+        if (serverClipSupport != null) {
+            logger.info("Generating " + serverClipSupport.getName().toLowerCase() + " server...");
+            this.patchServerJar0(serverClipSupport.patchServerClip(in, logger), out);
+            ServerClipSupport.cleanServerClip();
         } else {
            this.patchServerJar0(in, out);
         }
@@ -189,13 +189,15 @@ public class KibblePatcher implements Opcodes {
             srv.put(CRAFT_SERVER, patchGC(srv.get(CRAFT_SERVER), "reload", stats));
             String NMS_DEDICATED_SERVER = "net/minecraft/server/" + NMS + "/DedicatedServer.class";
             srv.put(NMS_DEDICATED_SERVER, patchGC(srv.get(NMS_DEDICATED_SERVER), "init", stats));
-            byte[] paperJvmCheck = srv.get(PAPER_JVM_CHECKER);
-            if (paperJvmCheck != null) {
-                srv.put(PAPER_JVM_CHECKER, patchPaperJavaWarning(paperJvmCheck));
-            }
-            paperJvmCheck = srv.get(PAPER_JVM_CHECKER_OLD);
-            if (paperJvmCheck != null) {
-                srv.put(PAPER_JVM_CHECKER_OLD, patchPaperJavaWarning(paperJvmCheck));
+            if (this.featuresPatches) {
+                byte[] paperJvmCheck = srv.get(PAPER_JVM_CHECKER);
+                if (paperJvmCheck != null) {
+                    srv.put(PAPER_JVM_CHECKER, patchPaperJavaWarning(paperJvmCheck));
+                }
+                paperJvmCheck = srv.get(PAPER_JVM_CHECKER_OLD);
+                if (paperJvmCheck != null) {
+                    srv.put(PAPER_JVM_CHECKER_OLD, patchPaperJavaWarning(paperJvmCheck));
+                }
             }
             if (compatibilityPatches) {
                 // Add commonly used APIs on old plugins

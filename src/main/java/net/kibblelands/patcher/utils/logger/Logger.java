@@ -6,16 +6,34 @@ import org.fusesource.jansi.AnsiConsole;
 import java.io.PrintStream;
 
 public class Logger {
+    private static final String prefixUTF = "▶ ";
+    private static final String prefixASCII = "> ";
+    private static final String prefix;
+
     static {
+        boolean supportUnicode = true;
         try {
             if (System.getProperty("os.name").toLowerCase().contains("win")) {
                 AnsiConsole.systemInstall();
+                // Check windows UTF-8 support or if git/cygwin terminal
+                supportUnicode =
+                        "cygwin".equals(System.getenv("TERM"))
+                        || "1".equals(System.getenv("WINUTF8"));
+                if (supportUnicode) {
+                    System.setOut(new PrintStream(System.out, true, "UTF-8"));
+                }
+            } else {
+                System.setOut(new PrintStream(System.out, true, "UTF-8"));
             }
-            System.setOut(new PrintStream(System.out, true, "UTF-8"));
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+            supportUnicode = false;
+        }
+        prefix = supportUnicode ? prefixUTF : prefixASCII;
     }
 
-    private static final String prefix = "▶ ";
+    public static String getPrefix() {
+        return prefix;
+    }
 
     private final String name;
 

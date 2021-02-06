@@ -26,7 +26,7 @@ you were to go back in time.
 The main gain of performance from KibblePatcher is the redirect math
 calls of `sin`, `cos`, and `tan` of plugins to the Minecraft 
 implementation to improve plugins performance.  
-(BetterFPS)[https://www.curseforge.com/minecraft/mc-mods/betterfps] 
+[BetterFPS](https://www.curseforge.com/minecraft/mc-mods/betterfps) 
 is a great benchmark tool for different `sin` and `cos` algorithm!  
 Generally only 1.13+ support this feature.  
 (In theory, by back-porting a part of 1.13+ classloading system, 

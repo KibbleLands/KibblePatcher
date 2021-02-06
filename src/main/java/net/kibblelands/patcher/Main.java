@@ -5,13 +5,11 @@ import net.kibblelands.patcher.utils.IOUtils;
 import net.kibblelands.patcher.utils.logger.Logger;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.List;
 import java.util.jar.Attributes;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
-import java.util.jar.JarInputStream;
 
 public final class Main {
     private static final Logger LOGGER = new Logger("KibblePatcher");
@@ -46,7 +44,7 @@ public final class Main {
                 System.exit(2);
                 return;
             }
-            boolean paperclip = PaperClipSupport.getPaperClipMCVer(in) != null;
+            ServerClipSupport serverClipSupport = ServerClipSupport.getServerClipSupport(in);
             try (JarFile jarFile = new JarFile(in)) {
                 Attributes mainAttributes = jarFile.getManifest().getMainAttributes();
                 String version = mainAttributes.getValue("Kibble-Version");
@@ -56,7 +54,8 @@ public final class Main {
                     pluginRewrite = "BUILT-IN";
                 }
                 if (version == null && versionBuiltIn == null) {
-                    LOGGER.info("This " + (paperclip ? "paperclip " : "") +
+                    LOGGER.info("This " + (serverClipSupport != null ?
+                            serverClipSupport.getName().toLowerCase() + " " : "") +
                             "server hasn't been patched by KibblePatcher yet.");
                     return;
                 }
