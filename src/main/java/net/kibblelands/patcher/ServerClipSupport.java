@@ -1,6 +1,5 @@
 package net.kibblelands.patcher;
 
-import net.kibblelands.patcher.utils.ConsoleColors;
 import net.kibblelands.patcher.utils.IOUtils;
 import net.kibblelands.patcher.utils.logger.Logger;
 
@@ -9,8 +8,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.NoSuchElementException;
-import java.util.Scanner;
 import java.util.UUID;
 import java.util.jar.JarFile;
 import java.util.stream.Collectors;
@@ -18,7 +15,7 @@ import java.util.zip.ZipEntry;
 
 public class ServerClipSupport {
     private static final File self = new File(ServerClipSupport.class.getProtectionDomain()
-            .getCodeSource().getLocation().getFile()).getAbsoluteFile();
+            .getCodeSource().getLocation().getFile().replace("%20", " ")).getAbsoluteFile();
     private static final File tmp = new File(new File(System.getProperty("java.io.tmpdir")),
             "KibblePatcher-" + UUID.randomUUID().toString()).getAbsoluteFile();
     private static final File javaHome = new File(System.getProperty("java.home")).getAbsoluteFile();

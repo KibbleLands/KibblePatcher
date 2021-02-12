@@ -39,7 +39,7 @@ public class KibblePatcher implements Opcodes {
     private static final String BUKKIT_VERSION_COMMAND = "org/bukkit/command/defaults/VersionCommand.class";
     private static final String PAPER_JVM_CHECKER_OLD = "com/destroystokyo/paper/util/PaperJvmChecker.class";
     private static final String PAPER_JVM_CHECKER = "io/papermc/paper/util/PaperJvmChecker.class";
-    public static final String KIBBLE_VERSION = "1.5.1";
+    public static final String KIBBLE_VERSION = "1.5.2";
     /**
      * KillSwitch for compatibility patches
      * Can be disabled if your server doesn't require it

@@ -1,7 +1,6 @@
 package net.kibblelands.patcher.patches;
 
 import net.kibblelands.patcher.CommonGenerator;
-import net.kibblelands.patcher.KibblePatcher;
 import net.kibblelands.patcher.rebuild.ClassDataProvider;
 import net.kibblelands.patcher.utils.ASMUtils;
 import net.kibblelands.patcher.utils.ConsoleColors;
