@@ -16,7 +16,6 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 public class BiomeConfigAPIFeature implements Opcodes {
-    private static final String PIGLIN_BRUTE = "org/bukkit/entity/PiglinBrute.class";
     private static final String BUKKIT_BIOME = "org/bukkit/block/Biome";
     private static final String BUKKIT_WORLD = "org/bukkit/World";
     private static final String BUKKIT_PARTICLE = "org/bukkit/Particle";
@@ -37,10 +36,6 @@ public class BiomeConfigAPIFeature implements Opcodes {
     private static final String NMS_CRAFT_PARTICLE = "org/bukkit/craftbukkit/$NMS/CraftParticle";
     private static final String NMS_CRAFT_SOUND = "org/bukkit/craftbukkit/$NMS/CraftSound";
 
-    private static boolean isSupported(Map<String, byte[]> map) {
-        return map.containsKey(PIGLIN_BRUTE); // Test if at least 1.16.2
-    }
-
     private static final String[] biomeApiClasses = new String[]{
             "net/kibblelands/server/biome/BiomeConfig.class",
             "net/kibblelands/server/biome/BiomeMusic.class",
@@ -57,9 +52,9 @@ public class BiomeConfigAPIFeature implements Opcodes {
             "GrassColor",
     };
 
-    public static void install(CommonGenerator commonGenerator, Map<String, byte[]> map, Map<String, byte[]> inject,
-                               ClassDataProvider cdp, final int[] stats) throws IOException {
-        if (!isSupported(map)) return; // Skip on pre 1.16.2
+    public static void install(CommonGenerator commonGenerator, Map<String, byte[]> map,
+                               Map<String, byte[]> inject, ClassDataProvider cdp) throws IOException {
+        if (!ASMUtils.supportRemoteDataEdit(map)) return; // Skip on pre 1.16.2
         String NMS = commonGenerator.getNMS();
         String BIOME_BASE = NMS_BIOME_BASE.replace("$NMS", NMS);
         String BIOME_FOG = NMS_BIOME_FOG.replace("$NMS", NMS);
@@ -290,6 +285,7 @@ public class BiomeConfigAPIFeature implements Opcodes {
             n2b.add(new MethodInsnNode(INVOKESPECIAL,
                     API_BIOME_MUSIC, "<init>", "(L" + BUKKIT_SOUND + ";IIZ)V"));
         });
+        ASMUtils.nullOnNPE(ASMUtils.findMethod(biomeBase, "getBiomeMusic"));
         FieldNode grassColorAccessor = ASMUtils
                 .findFieldByTypeOrOptional(biomeFog, GRASS_COLOR);
         if (grassColorAccessor == null) {
@@ -470,7 +466,7 @@ public class BiomeConfigAPIFeature implements Opcodes {
     }
 
     public static void installLib(Map<String, byte[]> map, Map<String, byte[]> inject) throws IOException {
-        if (!isSupported(map)) return; // Skip on pre 1.16.2
+        if (!ASMUtils.supportRemoteDataEdit(map)) return; // Skip on pre 1.16.2
         for (String file:biomeApiClasses) {
             inject.put(file, IOUtils.readResource(file));
         }
@@ -506,7 +502,7 @@ public class BiomeConfigAPIFeature implements Opcodes {
     }
 
     private static void wtf(String NMS, String state) {
-        System.out.println("A feature installation has failed in an unexpected way. please report the issue with your server jar!");
+        System.out.println("The BiomeConfigAPI installation has failed in an unexpected way. please report the issue with your server jar!");
         System.out.println("NMS: "+NMS);
         System.out.println("Debug state: "+ state);
     }

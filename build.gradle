@@ -8,7 +8,7 @@ plugins {
 }
 
 group 'org.example'
-version '1.5.2'
+version '1.6.0'
 
 targetCompatibility = '1.8'
 sourceCompatibility = '1.8'
@@ -47,8 +47,8 @@ afterEvaluate {
 
 dependencies {
     testCompile group: 'junit', name: 'junit', version: '4.12'
-    implementation 'org.ow2.asm:asm-commons:9.0'
-    shadow 'org.ow2.asm:asm-commons:9.0'
+    implementation 'org.ow2.asm:asm-commons:9.1'
+    shadow 'org.ow2.asm:asm-commons:9.1'
     implementation 'org.fusesource.jansi:jansi:2.1.0'
     shadow 'org.fusesource.jansi:jansi:2.1.0'
     // Bukkit dependency (Only used in net.kibblelands.server.*)

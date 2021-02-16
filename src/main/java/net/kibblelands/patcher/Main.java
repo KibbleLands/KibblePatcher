@@ -6,6 +6,7 @@ import net.kibblelands.patcher.utils.logger.Logger;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.List;
 import java.util.jar.Attributes;
 import java.util.jar.JarEntry;
@@ -18,6 +19,7 @@ public final class Main {
         boolean builtInMode = false;
         boolean builtInModeRewrite = false;
         boolean fullPatch = false;
+        boolean generate = false;
         String builtInPkg = null;
         if (args.length == 4 && ("-builtin-has-rewrite".equals(args[0]) ||
                 (builtInModeRewrite = "-builtin".equals(args[0])))) {
@@ -25,16 +27,66 @@ public final class Main {
             builtInMode = true;
             builtInPkg = args[1];
         }
-        if (args.length == 3 && ("-full".equals(args[0]))) {
-            args = new String[]{args[1], args[2]};
-            fullPatch = true;
+        if (args.length == 3) {
+            if (("-full".equals(args[0]))) {
+                args = new String[]{args[1], args[2]};
+                fullPatch = true;
+            } else if (("-generate".equals(args[0]))) {
+                args = new String[]{args[1], args[2]};
+                generate = true;
+            }
         }
         if (args.length != 2) {
             LOGGER.stdout("Usage: \n" +
                     "    java -jar KibblePatcher.jar <input> <output>\n" +
+                    "    java -jar KibblePatcher.jar -generate <input> <output>\n" +
                     "    java -jar KibblePatcher.jar -patch <file>\n" +
                     "    java -jar KibblePatcher.jar -info <file>\n");
             System.exit(1);
+            return;
+        }
+        if (generate || args[0].equals("-generate")) {
+            File in = new File(args[generate ? 0 : 1]);
+            File out;
+            if (generate) {
+                out = new File(args[1]);
+            } else {
+                int index = args[1].lastIndexOf('.');
+                int index2 = args[1].lastIndexOf(File.separatorChar);
+                if (index < index2) index = -1;
+                out = new File((index == -1 ? args[1] :
+                        args[1].substring(0, index)) + "-generated.jar");
+            }
+            if (!in.exists()) {
+                LOGGER.error("Input file doesn't exists!");
+                System.exit(2);
+                return;
+            }
+            if (out.exists()) {
+                LOGGER.error("Output file already exists!");
+                System.exit(2);
+                return;
+            }
+            ServerClipSupport serverClipSupport =
+                    ServerClipSupport.getServerClipSupport(in);
+            if (serverClipSupport == null) {
+                LOGGER.error("The provided jar is not in a supported server-clip format!");
+                System.exit(3);
+                return;
+            }
+            LOGGER.info("Generating " + serverClipSupport.getName().toLowerCase() + " server...");
+            File generated = serverClipSupport.patchServerClip(in);
+            try {
+                Files.move(generated.toPath(), out.toPath());
+            } catch (IOException e) {
+                LOGGER.error("Failed to write file to output directory!");
+                ServerClipSupport.cleanServerClip();
+                System.exit(4);
+                return;
+            }
+            LOGGER.info("Finished!");
+            ServerClipSupport.cleanServerClip();
+            System.exit(0);
             return;
         }
         if (args[0].equals("-info")) {

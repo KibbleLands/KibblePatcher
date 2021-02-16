@@ -3,15 +3,16 @@ package net.kibblelands.patcher.patches;
 import net.kibblelands.patcher.CommonGenerator;
 import net.kibblelands.patcher.utils.ASMUtils;
 import net.kibblelands.patcher.utils.ConsoleColors;
-import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.*;
 import org.objectweb.asm.tree.*;
 
 import java.util.Map;
 
 public class MethodResultCacheOptimizer implements Opcodes {
     private static final String FURNACE_TILE = "net/minecraft/server/$NMS/TileEntityFurnace.class";
+    private static final String BLOCK_POSITION = "net/minecraft/server/$NMS/BlockPosition.class";
+    private static final String CRAFT_BLOCK = "org/bukkit/craftbukkit/$NMS/block/CraftBlock.class";
+    private static final String LOCATION = "org/bukkit/Location.class";
 
     public static void patch(CommonGenerator commonGenerator,Map<String, byte[]> map, final int[] stats) {
         String NMS = commonGenerator.getNMS();
@@ -19,7 +20,8 @@ public class MethodResultCacheOptimizer implements Opcodes {
         if (bytes != null) {
             ClassNode classNode = new ClassNode();
             new ClassReader(bytes).accept(classNode, 0);
-            MethodNode methodNode = ASMUtils.findMethodBySignature(classNode, "()Ljava/util/Map<Lnet/minecraft/server/$NMS/Item;Ljava/lang/Integer;>;".replace("$NMS", NMS));
+            MethodNode methodNode = ASMUtils.findMethodBySignature(classNode,
+                    "()Ljava/util/Map<Lnet/minecraft/server/$NMS/Item;Ljava/lang/Integer;>;".replace("$NMS", NMS));
             if (methodNode != null) {
                 cacheMethodResult(classNode, methodNode);
                 stats[4]++;
@@ -27,8 +29,98 @@ public class MethodResultCacheOptimizer implements Opcodes {
             ClassWriter classWriter = new ClassWriter(0);
             classNode.accept(classWriter);
             map.put(FURNACE_TILE.replace("$NMS", NMS), classWriter.toByteArray());
-            commonGenerator.addChangeEntry("Cached furnace fuel list " + ConsoleColors.CYAN + "(Optimisation)");
+            commonGenerator.addChangeEntry("Cache furnace fuel list " + ConsoleColors.CYAN + "(Optimisation)");
         }
+        bytes = map.get(BLOCK_POSITION.replace("$NMS", NMS));
+        if (bytes != null) {
+            ClassNode classNode = new ClassNode();
+            new ClassReader(bytes).accept(classNode, 0);
+            if (cacheHashCode(classNode, true, true)) {
+                if (!"java/lang/Object".equals(classNode.superName)) {
+                    ClassWriter classWriter = new ClassWriter(0);
+                    new ClassReader(map.get(classNode.superName + ".class")).accept(new ClassVisitor(ASMUtils.ASM_BUILD, classWriter) {
+                        @Override
+                        public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
+                            if (name.equals("hashCode") && descriptor.equals("()I")) {
+                                access &= ~ACC_FINAL;
+                            }
+                            return super.visitMethod(access, name, descriptor, signature, exceptions);
+                        }
+                    }, 0);
+                    map.put(classNode.superName + ".class", classWriter.toByteArray());
+                }
+                ClassWriter classWriter = new ClassWriter(0);
+                classNode.accept(classWriter);
+                map.put(BLOCK_POSITION.replace("$NMS", NMS), classWriter.toByteArray());
+                commonGenerator.addChangeEntry("Cache BlockPosition hash " + ConsoleColors.CYAN + "(Optimisation)");
+            }
+        }
+        bytes = map.get(CRAFT_BLOCK.replace("$NMS", NMS));
+        if (bytes != null) {
+            ClassNode classNode = new ClassNode();
+            new ClassReader(bytes).accept(classNode, 0);
+            if (cacheHashCode(classNode, true, false)) {
+                ClassWriter classWriter = new ClassWriter(0);
+                classNode.accept(classWriter);
+                map.put(CRAFT_BLOCK.replace("$NMS", NMS), classWriter.toByteArray());
+                commonGenerator.addChangeEntry("Cache CraftBlock hash " + ConsoleColors.CYAN + "(Optimisation)");
+            }
+        }
+        bytes = map.get(LOCATION);
+        if (bytes != null) {
+            ClassNode classNode = new ClassNode();
+            new ClassReader(bytes).accept(classNode, 0);
+            if (cacheHashCode(classNode, false, false)) {
+                ClassWriter classWriter = new ClassWriter(0);
+                classNode.accept(classWriter);
+                map.put(LOCATION, classWriter.toByteArray());
+                commonGenerator.addChangeEntry("Cache Location hash " + ConsoleColors.CYAN + "(Optimisation)");
+            }
+        }
+    }
+
+    public static boolean cacheHashCode(ClassNode classNode,boolean immutableHash,boolean finalHash) {
+        MethodNode hashCode = ASMUtils.findMethod(classNode, "hashCode", "()I");
+        if (hashCode == null) {
+            if (immutableHash) {
+                String superAsm = classNode.superName;
+                if (superAsm.equals("java/lang/Object")) {
+                    return false;
+                }
+                // Create default hashCode implementation
+                classNode.methods.add(hashCode = new MethodNode(ACC_PUBLIC, "hashCode", "()I", null, null));
+                hashCode.instructions.add(new VarInsnNode(ALOAD, 0));
+                hashCode.instructions.add(new MethodInsnNode(INVOKESPECIAL, superAsm, "hashCode", "()I"));
+                hashCode.instructions.add(new InsnNode(IRETURN));
+            } else {
+                return false;
+            }
+        }
+        cacheMethodResult(classNode, hashCode);
+        if (immutableHash) return true;
+        final String fName = "hashCode$cache";
+        final String asmName = classNode.name;
+        for (MethodNode methodNode: classNode.methods) {
+            InsnList insnList = methodNode.instructions;
+            if ((methodNode.access & ACC_STATIC) != 0 || methodNode == hashCode
+                    || methodNode.name.equals("<init>") || insnList == null) {
+                continue; // This method is not a target for hash reset.
+            }
+            boolean shouldResetHash = false;
+            for (AbstractInsnNode insnNode : insnList) {
+                if (insnNode.getOpcode() == PUTFIELD &&
+                        ((FieldInsnNode) insnNode).owner.equals(asmName)) {
+                    shouldResetHash = true;
+                    break;
+                }
+            }
+            if (shouldResetHash) { // prepend hash reset to the method if needed
+                insnList.insert(new FieldInsnNode(PUTFIELD, asmName, fName, "I"));
+                insnList.insert(new InsnNode(ICONST_0));
+                insnList.insert(new VarInsnNode(ALOAD, 0));
+            }
+        }
+        return true;
     }
 
     public static void cacheMethodResult(ClassNode classNode, MethodNode methodNode) {

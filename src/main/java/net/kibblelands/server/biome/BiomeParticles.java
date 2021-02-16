@@ -1,8 +1,7 @@
 package net.kibblelands.server.biome;
 
-import org.bukkit.Location;
-import org.bukkit.Particle;
-import org.bukkit.World;
+import org.bukkit.*;
+import org.bukkit.inventory.ItemStack;
 
 import java.util.Objects;
 
@@ -16,22 +15,39 @@ public final class BiomeParticles {
     }
 
     public BiomeParticles(Particle particle, Object particleData, float frequency) {
-        this.particle = particle;
-        this.particleData = particleData;
-        this.frequency = frequency;
         // Check integrity
         if (particle == null) {
             throw new NullPointerException("Particle must not be null!");
         }
-        Class<?> cl = particle.getDataType();
-        if (particleData == null || (cl != Void.class && cl.isInstance(particleData))) {
-            if (frequency <= 0F) {
-                throw new NullPointerException("Frequency must be positive!");
-            }
-            return;
+        if (frequency <= 0F) {
+            throw new IllegalArgumentException("Frequency must be positive!");
         }
-        throw new IllegalStateException("Invalid particleData type! (Found "
-                + particleData.getClass().getName() +", expected "+ cl.getName()+")");
+        Class<?> cl = particle.getDataType();
+        // Set default particleData if none provided
+        if (particleData == null) {
+            switch (cl.getSimpleName()) {
+                default:
+                case "Void":
+                    break;
+                case "DustOptions":
+                    particleData = new Particle.DustOptions(Color.WHITE, 1F);
+                    break;
+                case "ItemStack":
+                    particleData = new ItemStack(Material.STONE);
+                    break;
+                case "BlockData":
+                    particleData = Bukkit.createBlockData(Material.STONE);
+                    break;
+            }
+        }
+        if (particleData != null && (cl != Void.class && !cl.isInstance(particleData))) {
+            throw new IllegalArgumentException("Invalid particleData type! (Found "
+                    + particleData.getClass().getName() + ", expected "+ cl.getName() +")");
+        }
+        // Apply values
+        this.particle = particle;
+        this.particleData = particleData;
+        this.frequency = frequency;
     }
 
     public BiomeParticles withData(Object particleData) {
@@ -49,6 +65,10 @@ public final class BiomeParticles {
     }
 
     public BiomeParticles withParticle(Particle particle,Object particleData) {
+        return new BiomeParticles(particle, particleData, frequency);
+    }
+
+    public BiomeParticles withParticleData(Object particleData) {
         return new BiomeParticles(particle, particleData, frequency);
     }
 

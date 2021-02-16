@@ -1,19 +1,34 @@
 package net.kibblelands.patcher.patches;
 
 import net.kibblelands.patcher.CommonGenerator;
-import net.kibblelands.patcher.utils.ASMUtils;
-import net.kibblelands.patcher.utils.ConsoleColors;
+import net.kibblelands.patcher.utils.*;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 
+import java.io.IOException;
 import java.util.Map;
 
 public class PluginRewriteOptimiser implements Opcodes {
+    private static final String REWRITE_ETC = "net/kibblelands/patcher/runtime/RewriteEtc.class";
     private static final String COMMODORE_MV = "org/bukkit/craftbukkit/$NMS/util/Commodore$1$1.class";
 
-    public static void patch(CommonGenerator commonGenerator,Map<String, byte[]> map,String accessPkg, final boolean[] plRewrite) {
+    public static void patch(CommonGenerator commonGenerator,Map<String, byte[]> map,
+                             Map<String, byte[]> inject,String accessPkg, final boolean[] plRewrite) {
+        byte[] bytes;
+        try {
+            bytes = IOUtils.readResource(REWRITE_ETC);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return;
+        }
+        { ClassReader classReader = new ClassReader(bytes);
+        ClassWriter classWriter = new ClassWriter(0);
+        classReader.accept(new ClassRelocator(new ClassRelocator(classWriter
+                , new PrefixRemapper("net/kibblelands/patcher/runtime/", accessPkg)),
+                new PrefixRemapper("net/kibblelands/server/util/", accessPkg)), 0);
+        bytes = classWriter.toByteArray(); }
         String NMS = commonGenerator.getNMS();
         String COMMODORE_MV = PluginRewriteOptimiser.COMMODORE_MV.replace("$NMS", NMS);
         byte[] methodVisitor = map.get(COMMODORE_MV);
@@ -37,37 +52,11 @@ public class PluginRewriteOptimiser implements Opcodes {
         insnNodes.add(new VarInsnNode(ILOAD, 1));
         insnNodes.add(ASMUtils.getNumberInsn(INVOKESTATIC));
         insnNodes.add(new JumpInsnNode(IF_ICMPNE, nextOpcode));
-        LabelNode ownerMatch = new LabelNode();
         insnNodes.add(new VarInsnNode(ALOAD, 2));
-        insnNodes.add(new LdcInsnNode("java/lang/Math"));
-        insnNodes.add(new MethodInsnNode(INVOKEVIRTUAL,
-                "java/lang/String", "equals", "(Ljava/lang/Object;)Z"));
-        insnNodes.add(new JumpInsnNode(IFNE, ownerMatch));
-        insnNodes.add(new VarInsnNode(ALOAD, 2));
-        insnNodes.add(new LdcInsnNode("java/lang/StrictMath"));
-        insnNodes.add(new MethodInsnNode(INVOKEVIRTUAL,
-                "java/lang/String", "equals", "(Ljava/lang/Object;)Z"));
-        insnNodes.add(new JumpInsnNode(IFEQ, skip));
-        insnNodes.add(ownerMatch);
-        LabelNode nameMatch = new LabelNode();
         insnNodes.add(new VarInsnNode(ALOAD, 3));
-        insnNodes.add(new LdcInsnNode("sin"));
-        insnNodes.add(new MethodInsnNode(INVOKEVIRTUAL,
-                "java/lang/String", "equals", "(Ljava/lang/Object;)Z"));
-        insnNodes.add(new JumpInsnNode(IFNE, nameMatch));
-        insnNodes.add(new VarInsnNode(ALOAD, 3));
-        insnNodes.add(new LdcInsnNode("cos"));
-        insnNodes.add(new MethodInsnNode(INVOKEVIRTUAL,
-                "java/lang/String", "equals", "(Ljava/lang/Object;)Z"));
-        insnNodes.add(new JumpInsnNode(IFNE, nameMatch));
-        insnNodes.add(new VarInsnNode(ALOAD, 3));
-        insnNodes.add(new LdcInsnNode("tan"));
-        insnNodes.add(new MethodInsnNode(INVOKEVIRTUAL,
-                "java/lang/String", "equals", "(Ljava/lang/Object;)Z"));
-        insnNodes.add(new JumpInsnNode(IFEQ, skip));
-        insnNodes.add(nameMatch);
-        // owner = "net/kibblelands/server/FastMath"
-        insnNodes.add(new LdcInsnNode(accessPkg + "FastMath"));
+        insnNodes.add(new VarInsnNode(ALOAD, 4));
+        insnNodes.add(new MethodInsnNode(INVOKESTATIC, accessPkg + "RewriteEtc", "rewriteOwner",
+                "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;"));
         insnNodes.add(new VarInsnNode(ASTORE, 2));
         // }
         insnNodes.add(new JumpInsnNode(GOTO, skip));
@@ -96,7 +85,7 @@ public class PluginRewriteOptimiser implements Opcodes {
         insnNodes.add(new JumpInsnNode(IFEQ, skip));
         /*
          opcode = INVOKESTATIC
-         owner = "net/kibblelands/server/FastReplace"
+         owner = "net/kibblelands/server/util/FastReplace"
          desc = "(Ljava/lang/String;Ljava/lang/CharSequence;Ljava/lang/CharSequence;)Ljava/lang/String;"
         * */
         insnNodes.add(ASMUtils.getNumberInsn(INVOKESTATIC));
@@ -113,6 +102,7 @@ public class PluginRewriteOptimiser implements Opcodes {
         ClassWriter classWriter = new ClassWriter(0);
         classNode.accept(classWriter);
         map.put(COMMODORE_MV, classWriter.toByteArray());
+        inject.put(accessPkg + "RewriteEtc.class", bytes);
         plRewrite[0] = true;
         commonGenerator.addChangeEntry("Installed Plugin sin/cos/tan rewrite." + ConsoleColors.CYAN + " (Optimisation)");
     }

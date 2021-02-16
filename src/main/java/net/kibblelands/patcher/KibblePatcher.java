@@ -3,13 +3,9 @@ package net.kibblelands.patcher;
 import net.kibblelands.patcher.ext.ForEachRemover;
 import net.kibblelands.patcher.patches.*;
 import net.kibblelands.patcher.rebuild.ClassDataProvider;
-import net.kibblelands.patcher.utils.ConsoleColors;
-import net.kibblelands.patcher.utils.IOUtils;
-import net.kibblelands.patcher.utils.KibbleOutputStream;
-import net.kibblelands.patcher.utils.PatchMap;
+import net.kibblelands.patcher.utils.*;
 import net.kibblelands.patcher.utils.logger.Logger;
 import org.objectweb.asm.*;
-import org.objectweb.asm.commons.ClassRemapper;
 import org.objectweb.asm.commons.Remapper;
 import org.objectweb.asm.tree.*;
 
@@ -39,7 +35,10 @@ public class KibblePatcher implements Opcodes {
     private static final String BUKKIT_VERSION_COMMAND = "org/bukkit/command/defaults/VersionCommand.class";
     private static final String PAPER_JVM_CHECKER_OLD = "com/destroystokyo/paper/util/PaperJvmChecker.class";
     private static final String PAPER_JVM_CHECKER = "io/papermc/paper/util/PaperJvmChecker.class";
-    public static final String KIBBLE_VERSION = "1.5.2";
+    public static final String KIBBLE_VERSION = "1.6.0";
+    // Enable dev warnings if the version contains "-dev"
+    @SuppressWarnings("ALL")
+    public static final boolean DEV_BUILD = KIBBLE_VERSION.contains("-dev");
     /**
      * KillSwitch for compatibility patches
      * Can be disabled if your server doesn't require it
@@ -67,13 +66,16 @@ public class KibblePatcher implements Opcodes {
     /**
      * Prefix of FastMath and FastReplace classes
      */
-    public String builtInPkg = "net/kibblelands/server/";
+    public String builtInPkg = "net/kibblelands/server/util/";
 
     public void patchServerJar(File in, File out) throws IOException {
+        if (DEV_BUILD) {
+            logger.warn("This version is an unofficial dev build of KibblePatcher!");
+        }
         ServerClipSupport serverClipSupport = ServerClipSupport.getServerClipSupport(in);
         if (serverClipSupport != null) {
             logger.info("Generating " + serverClipSupport.getName().toLowerCase() + " server...");
-            this.patchServerJar0(serverClipSupport.patchServerClip(in, logger), out);
+            this.patchServerJar0(serverClipSupport.patchServerClip(in), out);
             ServerClipSupport.cleanServerClip();
         } else {
            this.patchServerJar0(in, out);
@@ -101,7 +103,7 @@ public class KibblePatcher implements Opcodes {
         }
         Manifest manifest = new Manifest(new ByteArrayInputStream(srv.get(JarFile.MANIFEST_NAME)));
         if (manifest.getMainAttributes().containsKey("Kibble-Version") ||
-                srv.containsKey("net/kibblelands/server/FastMath.class")) {
+                srv.containsKey("net/kibblelands/server/util/FastMath.class")) {
             String kibbleVer = manifest.getMainAttributes().getValue("Kibble-Version");
             logger.error("The file was already patched by Kibble "+kibbleVer+"!");
             logger.warn("Please use original server file for patching!");
@@ -111,8 +113,6 @@ public class KibblePatcher implements Opcodes {
         // This help plugins to prevent their behaviour from changing if KibblePatcher lite is present
         // As if a plugin made for KibblePatcher detect it it might use APIs not available in the partial
         // version, the dynamic package is also here to discourage the use of these APIs in lite mode
-        String hidePkg = "abcdef".charAt(new Random().nextInt(6)) + // This is not kibble patcher API
-                UUID.randomUUID().toString().replace("-", "") + "/not/kibble/patcher/";
         boolean isBuiltInPatched = (!this.builtInMode) &&
                 manifest.getMainAttributes().containsKey("Kibble-BuiltIn") ||
                 // Kept for backward compatibility reasons
@@ -134,6 +134,13 @@ public class KibblePatcher implements Opcodes {
                 break;
             }
         }
+        String fast_util_prefix = null;
+        if (srv.containsKey("it/unimi/dsi/fastutil/objects/Object2BooleanOpenHashMap.class")) {
+            fast_util_prefix = "it/unimi/dsi/fastutil/";
+        } else if (srv.containsKey(
+                "org/bukkit/craftbukkit/libs/it/unimi/dsi/fastutil/objects/Object2BooleanOpenHashMap.class")) {
+            fast_util_prefix = "org/bukkit/craftbukkit/libs/it/unimi/dsi/fastutil/";
+        }
         if (compatibilityPatches && !javaZipMitigation && MathHelper == null
                 && srv.get(CRAFT_BUKKIT_MAIN) == null && srv.get(BUKKIT_API) != null) {
             if (this.builtInMode) {
@@ -154,6 +161,10 @@ public class KibblePatcher implements Opcodes {
             return;
         }
         String NMS = libraryMode ? null : MathHelper.substring(21, MathHelper.lastIndexOf('/'));
+        Random accessPkgRnd = new Random();
+        String accessPkg = libraryMode ? "net/kibblelands/server/private/" :
+                "org/bukkit/craftbukkit/libs/" + "abcdef".charAt(accessPkgRnd.nextInt(6)) +
+                        UUID.randomUUID().toString().replace("-", "").substring(0, accessPkgRnd.nextInt(32)) + "/";
         // CommonGenerator is only available if features patches are enabled
         CommonGenerator commonGenerator = new CommonGenerator(NMS, this.featuresPatches && !this.builtInMode);
         ClassDataProvider classDataProvider = new ClassDataProvider(KibblePatcher.class.getClassLoader());
@@ -168,7 +179,7 @@ public class KibblePatcher implements Opcodes {
             if (!libraryMode) {
                 BlockDataOptimiser.patch(commonGenerator, srv, stats);
                 if (this.builtInModeRewrite) {
-                    PluginRewriteOptimiser.patch(commonGenerator, srv, this.builtInPkg, plRewrite);
+                    PluginRewriteOptimiser.patch(commonGenerator, srv, inject, this.builtInPkg, plRewrite);
                 }
                 NMSAccessOptimizer.patch(commonGenerator, srv);
             }
@@ -179,7 +190,7 @@ public class KibblePatcher implements Opcodes {
                 manifest.getEntries().put("net/minecraft/server/", attributes);
             }
             // Patch 20 seconds delay to 5 seconds delay
-            srv.put(CRAFT_BUKKIT_MAIN, patchDelayer(srv.get(CRAFT_BUKKIT_MAIN)));
+            srv.put(CRAFT_BUKKIT_MAIN, patchDelayer(commonGenerator, srv.get(CRAFT_BUKKIT_MAIN)));
             // Patch Server Brand / VersionCommand
             String NMS_SERVER = "net/minecraft/server/" + NMS + "/MinecraftServer.class";
             srv.put(NMS_SERVER, patchBrand(srv.get(NMS_SERVER), special));
@@ -216,14 +227,15 @@ public class KibblePatcher implements Opcodes {
                 ChunkCacheOptimizer.patch(commonGenerator, srv, stats);
                 MethodResultCacheOptimizer.patch(commonGenerator, srv, stats);
                 BlockDataOptimiser.patch(commonGenerator, srv, stats);
-                PluginRewriteOptimiser.patch(commonGenerator, srv, hidePkg, plRewrite);
+                PluginRewriteOptimiser.patch(commonGenerator, srv, inject, accessPkg, plRewrite);
                 NMSAccessOptimizer.patch(commonGenerator, srv);
             }
             // Add features patches
             if (featuresPatches) {
                 DataCommandFeature.install(commonGenerator, srv, stats);
                 EntityPropertiesFeature.install(commonGenerator, srv, inject, stats);
-                BiomeConfigAPIFeature.install(commonGenerator, srv, inject, classDataProvider, stats);
+                BiomeConfigAPIFeature.install(commonGenerator, srv, inject, classDataProvider);
+                DimensionConfigAPIFeature.install(commonGenerator, srv, inject, classDataProvider);
             }
             // Save in the jar if plugin rewrite is supported/installed
             manifest.getMainAttributes().putValue("Kibble-Rewrite",
@@ -233,6 +245,7 @@ public class KibblePatcher implements Opcodes {
             if (featuresPatches) {
                 EntityPropertiesFeature.installLib(inject);
                 BiomeConfigAPIFeature.installLib(srv, inject);
+                DimensionConfigAPIFeature.installLib(srv, inject);
             }
         }
         if (compatibilityPatches) {
@@ -246,10 +259,11 @@ public class KibblePatcher implements Opcodes {
                         IOUtils.readResource("javax/xml/bind/annotation/adapters/HexBinaryAdapter.class"));
             }
         }
-        if (((!this.builtInMode) || this.builtInPkg.equals("net/kibblelands/server/"))
-                && !(isBuiltInPatched && srv.containsKey("net/kibblelands/server/FastMath.class"))) {
-            byte[] FastMathAPI = IOUtils.readResource("net/kibblelands/server/FastMath.class");
-            byte[] FastReplaceAPI = IOUtils.readResource("net/kibblelands/server/FastReplace.class");
+        if (((!this.builtInMode) || this.builtInPkg.equals("net/kibblelands/server/util/"))
+                && !(isBuiltInPatched && srv.containsKey("net/kibblelands/server/util/FastMath.class"))) {
+            byte[] FastMathAPI = IOUtils.readResource("net/kibblelands/server/util/FastMath.class");
+            byte[] FastReplaceAPI = IOUtils.readResource("net/kibblelands/server/util/FastReplace.class");
+            byte[] FastCollectionsAPI = IOUtils.readResource("net/kibblelands/server/util/FastCollections.class");
             if (!libraryMode) { // Mirror FastMath to MathHelper
                 ClassNode fastMathClassNode = new ClassNode();
                 new ClassReader(FastMathAPI).accept(fastMathClassNode, 0);
@@ -306,27 +320,39 @@ public class KibblePatcher implements Opcodes {
                     fastReplaceClassNode.accept(classWriter);
                     FastReplaceAPI = classWriter.toByteArray();
                 }
+                ClassNode fastCollectionsClassNode = new ClassNode();
+                if (fast_util_prefix != null) {
+                    new ClassReader(FastCollectionsAPI).accept(new ClassRelocator(
+                            new ClassRelocator(fastCollectionsClassNode,
+                            new PrefixRemapper("java/util/HashMap",
+                                    fast_util_prefix+"objects/Object2ObjectOpenHashMap")),
+                            new PrefixRemapper("java/util/HashSet",
+                                    fast_util_prefix+"objects/ObjectOpenHashSet")), 0);
+                    classWriter = classDataProvider.newClassWriter();
+                    fastCollectionsClassNode.accept(classWriter);
+                    FastCollectionsAPI = classWriter.toByteArray();
+                } else {
+                    new ClassReader(FastCollectionsAPI).accept(fastCollectionsClassNode, 0);
+                }
                 if (!isBuiltInPatched) {
                     // Hide actual access methods, help against detection
                     // Some plugins no longer behave like intended
-                    Remapper hideRemapper = new Remapper() {
-                        @Override
-                        public String map(String internalName) {
-                            return internalName.startsWith("net/kibblelands/server/") ?
-                                    hidePkg + internalName.substring(23) : internalName;
-                        }
-                    };
+                    Remapper hideRemapper = new PrefixRemapper("net/kibblelands/server/util/", accessPkg);
                     classWriter = classDataProvider.newClassWriter();
-                    fastMathClassNode.accept(new ClassRemapper(classWriter, hideRemapper));
-                    inject.put(hidePkg + "FastMath.class/", classWriter.toByteArray());
+                    fastMathClassNode.accept(new ClassRelocator(classWriter, hideRemapper));
+                    inject.put(accessPkg + "FastMath.class", classWriter.toByteArray());
                     classWriter = classDataProvider.newClassWriter();
-                    fastReplaceClassNode.accept(new ClassRemapper(classWriter, hideRemapper));
-                    inject.put(hidePkg + "FastReplace.class/", classWriter.toByteArray());
+                    fastReplaceClassNode.accept(new ClassRelocator(classWriter, hideRemapper));
+                    inject.put(accessPkg + "FastReplace.class", classWriter.toByteArray());
+                    classWriter = classDataProvider.newClassWriter();
+                    fastCollectionsClassNode.accept(new ClassRelocator(classWriter, hideRemapper));
+                    inject.put(accessPkg + "FastCollections.class", classWriter.toByteArray());
                 }
             }
             if (this.featuresPatches) {
-                inject.put("net/kibblelands/server/FastMath.class", FastMathAPI);
-                inject.put("net/kibblelands/server/FastReplace.class", FastReplaceAPI);
+                inject.put("net/kibblelands/server/util/FastMath.class", FastMathAPI);
+                inject.put("net/kibblelands/server/util/FastReplace.class", FastReplaceAPI);
+                inject.put("net/kibblelands/server/util/FastCollections.class", FastCollectionsAPI);
                 commonGenerator.addChangeEntry("Added FastAPI. " + ConsoleColors.CYAN + "(Feature)");
             }
         }
@@ -337,8 +363,11 @@ public class KibblePatcher implements Opcodes {
             if (!isBuiltInPatched) {
                 for (Map.Entry<String, byte[]> entry : srv.entrySet()) {
                     if (entry.getKey().endsWith(".class")) {
-                        patchClassOpt(entry, classDataProvider, entry.getKey().startsWith("org/apache/commons/math3/") ||
-                                entry.getKey().startsWith("net/minecraft/server/") ? null : MathHelper, stats, hidePkg);
+                        patchClassOpt(entry, classDataProvider, fast_util_prefix == null ||
+                                        entry.getKey().startsWith(fast_util_prefix) ? null : fast_util_prefix,
+                                entry.getKey().startsWith("org/apache/commons/math3/") ||
+                                entry.getKey().startsWith("net/minecraft/server/")
+                                        ? null : MathHelper, stats, accessPkg);
                     } else if (entry.getKey().equals("pack.mcmeta") || entry.getKey().endsWith(".json")) {
                         trimJSON(entry);
                     }
@@ -389,7 +418,6 @@ public class KibblePatcher implements Opcodes {
             logger.info("Generic optimiser: " + ConsoleColors.YELLOW + "Skipped");
         } else {
             logger.info("Generic optimiser: ");
-            //logger.info("  Inlined calls: " + stats[0]); Useless
             logger.info("  Optimised java calls: " + ConsoleColors.CYAN + stats[1]);
             logger.info("  Optimised opcodes: " + ConsoleColors.CYAN + stats[2]);
             if (externalPatches) {
@@ -446,7 +474,8 @@ public class KibblePatcher implements Opcodes {
         in.close();
     }
 
-    public static byte[] patchDelayer(byte[] bytes) {
+    public static byte[] patchDelayer(CommonGenerator commonGenerator, byte[] bytes) {
+        final boolean[] didWork = new boolean[]{false};
         ClassReader classReader = new ClassReader(bytes);
         ClassWriter classWriter = new ClassWriter(0);
         classReader.accept(new ClassVisitor(ASM_BUILD, classWriter) {
@@ -469,9 +498,11 @@ public class KibblePatcher implements Opcodes {
                         } else if (value instanceof Long) {
                             if (patch20 && (Long) value == 20L) {
                                 patch20 = false;
+                                didWork[0] = true;
                                 value = 5L;
                             } else if (patch10 && (Long) value == 10L) {
                                 patch10 = false;
+                                didWork[0] = true;
                                 value = 5L;
                             }
                         }
@@ -480,7 +511,10 @@ public class KibblePatcher implements Opcodes {
                 };
             }
         }, 0);
-        return classWriter.toByteArray();
+        if (didWork[0]) {
+            commonGenerator.addChangeEntry("Reduced start delay when outdated to 5 seconds. " + ConsoleColors.CYAN + "(Productivity)");
+        }
+        return didWork[0] ? classWriter.toByteArray() : bytes;
     }
 
     public static byte[] patchPaperJavaWarning(byte[] bytes) {
@@ -592,24 +626,24 @@ public class KibblePatcher implements Opcodes {
         return classWriter.toByteArray();
     }
 
-    public void patchClassOpt(Map.Entry<String, byte[]> p,ClassDataProvider cdp,
-                              String Math,final int[] stats,String hidePkg) throws IOException {
-        patchClassOpt(p, cdp, Math, stats, false, hidePkg);
+    public void patchClassOpt(Map.Entry<String, byte[]> p,ClassDataProvider cdp, String fast_util_prefix,
+                              String Math,final int[] stats,String accessPkg) throws IOException {
+        patchClassOpt(p, cdp,fast_util_prefix, Math, stats, false, accessPkg);
     }
 
     private static final String replaceDesc =
             "(Ljava/lang/String;Ljava/lang/CharSequence;Ljava/lang/CharSequence;)Ljava/lang/String;";
 
-    private void patchClassOpt(final Map.Entry<String, byte[]> p,ClassDataProvider cdp, String Math,
-                               final int[] stats,final boolean err,final String hidePkg) throws IOException {
+    private void patchClassOpt(final Map.Entry<String, byte[]> p,ClassDataProvider cdp, String fast_util_prefix,
+                               String Math, final int[] stats,final boolean err,final String accessPkg) throws IOException {
         boolean[] requireCalc_dontOptimise = new boolean[]{false, false};
         ClassReader classReader = new ClassReader(p.getValue());
         ClassNode classNode = new ClassNode();
-        classReader.accept(classNode, 0);
+        classReader.accept(classNode, ClassReader.SKIP_FRAMES);
         if (externalPatches) {
             ForEachRemover.transform(classNode, cdp, stats);
         }
-        ClassWriter classWriter = err ? new ClassWriter(0) : cdp.newClassWriter();
+        ClassWriter classWriter = new ClassWriter(0);
 
         classNode.accept(new ClassVisitor(ASM_BUILD, classWriter) {
             @Override
@@ -645,7 +679,7 @@ public class KibblePatcher implements Opcodes {
                             opcode = INVOKESTATIC;
                             owner = KibblePatcher.this.builtInMode ?
                                     (KibblePatcher.this.builtInPkg + "FastReplace") :
-                                    hidePkg + "FastReplace";
+                                    accessPkg + "FastReplace";
                             descriptor = replaceDesc;
                             stats[1]++;
                         }
@@ -657,6 +691,7 @@ public class KibblePatcher implements Opcodes {
                         InsnList insnNodes = ((MethodNode) this.mv).instructions;
                         for (AbstractInsnNode insnNode : insnNodes.toArray()) {
                             AbstractInsnNode previous = insnNode.getPrevious();
+                            MethodInsnNode methodInsnNode;
                             if (previous == null) continue;
                             switch (insnNode.getOpcode()) {
                                 case F2D:
@@ -684,8 +719,7 @@ public class KibblePatcher implements Opcodes {
                                     }
                                     break;
                                 case INVOKESPECIAL:
-                                    MethodInsnNode methodInsnNode =
-                                            (MethodInsnNode) insnNode;
+                                    methodInsnNode = (MethodInsnNode) insnNode;
                                     if (methodInsnNode.desc.equals("()V") &&
                                             previous.getOpcode() == DUP) {
                                         AbstractInsnNode next = insnNode.getNext();
@@ -693,6 +727,49 @@ public class KibblePatcher implements Opcodes {
                                             insnNodes.remove(previous);
                                             insnNodes.remove(next);
                                             stats[2]++;
+                                        }
+                                    }
+                                    break;
+                                case INVOKEINTERFACE:
+                                    if (fast_util_prefix != null) {
+                                        methodInsnNode = (MethodInsnNode) insnNode;
+                                        if (previous.getOpcode() == INVOKEINTERFACE && methodInsnNode.name.equals("iterator")
+                                                && methodInsnNode.owner.equals(fast_util_prefix + "objects/ObjectSet")) {
+                                            methodInsnNode = (MethodInsnNode) previous;
+                                            if (methodInsnNode.owner.startsWith(fast_util_prefix) &&
+                                                    methodInsnNode.name.endsWith("2ObjectEntrySet")) {
+                                                String switchIdentifier = methodInsnNode.owner.substring(
+                                                        fast_util_prefix.length()) + "." + methodInsnNode.name;
+                                                String utilsCl = null;
+                                                switch (switchIdentifier) {
+                                                    case "shorts/Short2ObjectMap.short2ObjectEntrySet": {
+                                                        utilsCl = fast_util_prefix + "ints/Short2ObjectMaps";
+                                                        break;
+                                                    }
+                                                    case "ints/Int2ObjectMap.int2ObjectEntrySet": {
+                                                        utilsCl = fast_util_prefix + "ints/Int2ObjectMaps";
+                                                        break;
+                                                    }
+                                                    case "longs/Long2ObjectMap.long2ObjectEntrySet": {
+                                                        utilsCl = fast_util_prefix + "longs/Long2ObjectMaps";
+                                                        break;
+                                                    }
+                                                    case "objects/Object2ObjectMap.object2ObjectEntrySet": {
+                                                        utilsCl = fast_util_prefix + "objects/Object2ObjectMaps";
+                                                        break;
+                                                    }
+                                                }
+                                                if (utilsCl != null) {
+                                                    insnNodes.remove(insnNode);
+                                                    methodInsnNode.setOpcode(INVOKESTATIC);
+                                                    methodInsnNode.desc = "(L" + methodInsnNode.owner + ";)L" +
+                                                            fast_util_prefix + "objects/ObjectIterator;";
+                                                    methodInsnNode.owner = utilsCl;
+                                                    methodInsnNode.name = "fastIterator";
+                                                    methodInsnNode.itf = false;
+                                                    stats[1]++;
+                                                }
+                                            }
                                         }
                                     }
                             }
@@ -710,7 +787,7 @@ public class KibblePatcher implements Opcodes {
                 return;
             }
             byte[] data = classWriter.toByteArray();
-            classWriter = requireCalc_dontOptimise[0] ? cdp.newClassWriter() : new ClassWriter(ClassWriter.COMPUTE_MAXS);
+            classWriter = cdp.newClassWriter();
             new ClassReader(data).accept(new ClassVisitor(ASM_BUILD, classWriter) {
                 @Override
                 public MethodVisitor visitMethod(int access, String m_name, String m_descriptor, String signature, String[] exceptions) {
@@ -721,7 +798,7 @@ public class KibblePatcher implements Opcodes {
                                 super.visitMaxs(maxStack, maxLocals);
                             } catch (Throwable t) {
                                 try {
-                                    patchClassOpt(p, cdp, Math, stats, true, hidePkg);
+                                    patchClassOpt(p, cdp, fast_util_prefix, Math, stats, true, accessPkg);
                                 } catch (IOException ignored) {}
                                 throw new RuntimeException("Malformed method at " + p.getKey() + "#" + m_name + m_descriptor, t);
                             }

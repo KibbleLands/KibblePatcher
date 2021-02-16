@@ -1,5 +1,7 @@
 package net.kibblelands.patcher.utils;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.util.*;
 
 /**
@@ -7,7 +9,7 @@ import java.util.*;
  * This map put alls modifications to a secondary Map
  * The goal is to get all modifications in a separate Map to apply them later
  */
-@SuppressWarnings("SuspiciousMethodCalls") /* Intellij IDEA think hes smart by saying I code like shit but no */
+@SuppressWarnings("SuspiciousMethodCalls") // This class is a wrapper for 2 diferent maps
 public class PatchMap<K,V> extends AbstractMap<K,V> implements Map<K,V> {
     private final Map<K,V> orig, patch;
     private final TransformSet transformSet;
@@ -27,6 +29,7 @@ public class PatchMap<K,V> extends AbstractMap<K,V> implements Map<K,V> {
     }
 
     @Override
+    @NotNull
     public Set<Entry<K, V>> entrySet() {
         return this.transformSet;
     }
@@ -78,6 +81,7 @@ public class PatchMap<K,V> extends AbstractMap<K,V> implements Map<K,V> {
 
     private class TransformSet extends AbstractSet<Entry<K, V>> {
         @Override
+        @NotNull
         public Iterator<Entry<K, V>> iterator() {
             Iterator<Entry<K, V>> iterator = orig.entrySet().iterator();
             return new Iterator<Entry<K, V>>() {
@@ -95,6 +99,9 @@ public class PatchMap<K,V> extends AbstractMap<K,V> implements Map<K,V> {
 
                 @Override
                 public void remove() {
+                    if (latest == null) {
+                        throw new IllegalStateException();
+                    }
                     latest.setValue(null);
                 }
             };

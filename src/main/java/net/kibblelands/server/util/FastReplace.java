@@ -1,4 +1,4 @@
-package net.kibblelands.server;
+package net.kibblelands.server.util;
 
 /**
  * This class is edited automatically by the patcher

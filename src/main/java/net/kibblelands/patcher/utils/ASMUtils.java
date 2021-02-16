@@ -108,10 +108,6 @@ public class ASMUtils implements Opcodes {
         return null;
     }
 
-    public static void setOpcode(AbstractInsnNode insnNode,int opcode) {
-        ASMTreeAccessHelper.setOpcode(insnNode, opcode);
-    }
-
     public static boolean isLambda(InvokeDynamicInsnNode dynamicInsnNode) {
         final Handle bsm = dynamicInsnNode.bsm;
         return bsm.getTag() == H_INVOKESTATIC && bsm.getOwner().equals("java/lang/invoke/LambdaMetafactory")
@@ -265,5 +261,80 @@ public class ASMUtils implements Opcodes {
             return new IntInsnNode(Opcodes.SIPUSH, number);
         else
             return new LdcInsnNode(number);
+    }
+
+    public static void nullOnNPE(MethodNode methodNode) {
+        String desc = methodNode.desc;
+        if (desc.charAt(desc.indexOf(')') + 1) != 'L') {
+            throw new IllegalArgumentException("Return value must be an object type!");
+        }
+        LabelNode start = new LabelNode();
+        LabelNode end = new LabelNode();
+        LabelNode handler = new LabelNode();
+        methodNode.tryCatchBlocks.add(new TryCatchBlockNode(start, end, handler, "java/lang/NullPointerException"));
+        InsnList insnList = methodNode.instructions;
+        insnList.insert(start);
+        AbstractInsnNode lastCodeInsn = insnList.getLast();
+        while (lastCodeInsn.getOpcode() == -1) lastCodeInsn = lastCodeInsn.getPrevious();
+        if (lastCodeInsn.getOpcode() == ARETURN) lastCodeInsn = lastCodeInsn.getPrevious();
+        insnList.insert(lastCodeInsn, end);
+        // Add handler part
+        insnList.add(handler);
+        insnList.add(new InsnNode(POP));
+        insnList.add(new InsnNode(ACONST_NULL));
+        insnList.add(new InsnNode(ARETURN));
+    }
+
+    public static void createAccessorIfNecessary(ClassNode classNode, FieldNode fieldNode, String name) {
+        final boolean isStatic = (fieldNode.access & ACC_STATIC) != 0;
+        final Type type = Type.getType(fieldNode.desc);
+        final String getterPrefix = "Z".equals(fieldNode.desc) ? "is" : "get";
+        MethodNode methodNode = ASMUtils.findMethod(classNode, getterPrefix + name, "()" + fieldNode.desc);
+        if (methodNode != null) {
+            if (((methodNode.access & ACC_STATIC) == 0) == isStatic) {
+                throw new IllegalArgumentException("Static state missmatch: (Expected "+
+                        (isStatic ? "true, got false":"false, got true") + ")");
+            }
+            methodNode.access = ACC_PUBLIC|(isStatic?ACC_STATIC:0);
+        } else {
+            methodNode = new MethodNode(ACC_PUBLIC|(isStatic?ACC_STATIC:0),
+                    getterPrefix + name, "()" + fieldNode.desc, null, null);
+            InsnList insnList = methodNode.instructions;
+            if (!isStatic) {
+                insnList.add(new VarInsnNode(ALOAD, 0));
+            }
+            insnList.add(new FieldInsnNode(isStatic ? GETSTATIC : GETFIELD,
+                    classNode.name, fieldNode.name, fieldNode.desc));
+            insnList.add(new InsnNode(type.getOpcode(IRETURN)));
+            classNode.methods.add(methodNode);
+        }
+        methodNode = ASMUtils.findMethod(classNode, "set" + name, "(" + fieldNode.desc + ")V");
+        if (methodNode != null) {
+            if (((methodNode.access & ACC_STATIC) == 0) == isStatic) {
+                throw new IllegalArgumentException("Static state missmatch: (Expected "+
+                        (isStatic ? "true, got false":"false, got true") + ")");
+            }
+            methodNode.access = ACC_PUBLIC|(isStatic?ACC_STATIC:0);
+        } else {
+            if ((fieldNode.access & ACC_FINAL) != 0) {
+                fieldNode.access &= ~ACC_FINAL;
+            }
+            methodNode = new MethodNode(ACC_PUBLIC|(isStatic?ACC_STATIC:0),
+                    "set" + name, "(" + fieldNode.desc + ")V", null, null);
+            InsnList insnList = methodNode.instructions;
+            if (!isStatic) {
+                insnList.add(new VarInsnNode(ALOAD, 0));
+            }
+            insnList.add(new VarInsnNode(type.getOpcode(ILOAD), 1));
+            insnList.add(new FieldInsnNode(isStatic ? PUTSTATIC : PUTFIELD,
+                    classNode.name, fieldNode.name, fieldNode.desc));
+            insnList.add(new InsnNode(RETURN));
+            classNode.methods.add(methodNode);
+        }
+    }
+
+    @SuppressWarnings("ALL")
+    public static boolean supportRemoteDataEdit(Map<String, byte[]> map) {
+        return map.containsKey("org/bukkit/entity/PiglinBrute.class"); // Test if at least 1.16.2
     }
 }

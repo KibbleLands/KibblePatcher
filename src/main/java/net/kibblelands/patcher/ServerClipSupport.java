@@ -87,7 +87,7 @@ public class ServerClipSupport {
         return null;
     }
 
-    public File patchServerClip(File paperClip, Logger logger) throws IOException {
+    public File patchServerClip(File paperClip) throws IOException {
         if (mcVer == null) return paperClip;
         cleanServerClip();
         IOUtils.mkdirs(tmp);

@@ -11,6 +11,7 @@ The actual fast APIs available are:
 
 - `FastMath` that use the faster Minecraft Implementation of `sin` and `cos`
 - `FastReplace` that use faster Apache-Lang implementation of `replace`
+- `FastCollections` that use fastutil implementation of `Set` and `Map` if available.
 
 Note: `FastReplace` can fallback to other places where Apache-Lang is located,
 so it's safer to use `FastReplace` than to use Apache `replace` function directly
