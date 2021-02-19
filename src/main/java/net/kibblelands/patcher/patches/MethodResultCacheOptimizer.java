@@ -11,6 +11,7 @@ import java.util.Map;
 public class MethodResultCacheOptimizer implements Opcodes {
     private static final String FURNACE_TILE = "net/minecraft/server/$NMS/TileEntityFurnace.class";
     private static final String BLOCK_POSITION = "net/minecraft/server/$NMS/BlockPosition.class";
+    private static final String MUTABLE_BLOCK_POSITION = "net/minecraft/server/$NMS/BlockPosition$MutableBlockPosition.class";
     private static final String CRAFT_BLOCK = "org/bukkit/craftbukkit/$NMS/block/CraftBlock.class";
     private static final String LOCATION = "org/bukkit/Location.class";
 
@@ -33,12 +34,14 @@ public class MethodResultCacheOptimizer implements Opcodes {
         }
         bytes = map.get(BLOCK_POSITION.replace("$NMS", NMS));
         if (bytes != null) {
+            boolean mutableException = map.containsKey(MUTABLE_BLOCK_POSITION.replace("$NMS", NMS));
             ClassNode classNode = new ClassNode();
             new ClassReader(bytes).accept(classNode, 0);
-            if (cacheHashCode(classNode, true, true)) {
-                if (!"java/lang/Object".equals(classNode.superName)) {
+            if (cacheHashCode(classNode, !mutableException, false)) {
+                String baseBlockPos = classNode.superName;
+                if (!"java/lang/Object".equals(baseBlockPos)) {
                     ClassWriter classWriter = new ClassWriter(0);
-                    new ClassReader(map.get(classNode.superName + ".class")).accept(new ClassVisitor(ASMUtils.ASM_BUILD, classWriter) {
+                    new ClassReader(map.get(baseBlockPos + ".class")).accept(new ClassVisitor(ASMUtils.ASM_BUILD, classWriter) {
                         @Override
                         public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
                             if (name.equals("hashCode") && descriptor.equals("()I")) {
@@ -47,11 +50,21 @@ public class MethodResultCacheOptimizer implements Opcodes {
                             return super.visitMethod(access, name, descriptor, signature, exceptions);
                         }
                     }, 0);
-                    map.put(classNode.superName + ".class", classWriter.toByteArray());
+                    map.put(baseBlockPos + ".class", classWriter.toByteArray());
                 }
                 ClassWriter classWriter = new ClassWriter(0);
                 classNode.accept(classWriter);
                 map.put(BLOCK_POSITION.replace("$NMS", NMS), classWriter.toByteArray());
+                if (mutableException) {
+                    bytes = map.get(MUTABLE_BLOCK_POSITION.replace("$NMS", NMS));
+                    classNode = new ClassNode();
+                    new ClassReader(bytes).accept(classNode, 0);
+                    if (cacheHashCode(classNode, false, true, baseBlockPos)) {
+                        classWriter = new ClassWriter(0);
+                        classNode.accept(classWriter);
+                        map.put(MUTABLE_BLOCK_POSITION.replace("$NMS", NMS), classWriter.toByteArray());
+                    }
+                }
                 commonGenerator.addChangeEntry("Cache BlockPosition hash " + ConsoleColors.CYAN + "(Optimisation)");
             }
         }
@@ -79,12 +92,19 @@ public class MethodResultCacheOptimizer implements Opcodes {
         }
     }
 
-    public static boolean cacheHashCode(ClassNode classNode,boolean immutableHash,boolean finalHash) {
+    public static boolean cacheHashCode(ClassNode classNode,boolean immutableHash,boolean superEdit) {
+        return cacheHashCode(classNode, immutableHash, superEdit, null);
+    }
+
+    public static boolean cacheHashCode(ClassNode classNode,boolean immutableHash,
+                                        boolean superEdit,String optionalSuper) {
         MethodNode hashCode = ASMUtils.findMethod(classNode, "hashCode", "()I");
-        if (hashCode == null) {
-            if (immutableHash) {
-                String superAsm = classNode.superName;
+        String superAsm = classNode.superName;
+        boolean didWork = false;
+        if (!superEdit) {
+            if (hashCode == null) {
                 if (superAsm.equals("java/lang/Object")) {
+                    System.out.println("AAA");
                     return false;
                 }
                 // Create default hashCode implementation
@@ -92,12 +112,13 @@ public class MethodResultCacheOptimizer implements Opcodes {
                 hashCode.instructions.add(new VarInsnNode(ALOAD, 0));
                 hashCode.instructions.add(new MethodInsnNode(INVOKESPECIAL, superAsm, "hashCode", "()I"));
                 hashCode.instructions.add(new InsnNode(IRETURN));
-            } else {
-                return false;
             }
+            cacheMethodResult(classNode, hashCode);
+            if (immutableHash) return true;
+            didWork = true;
+        } else if (superAsm.equals("java/lang/Object")) {
+            return false;
         }
-        cacheMethodResult(classNode, hashCode);
-        if (immutableHash) return true;
         final String fName = "hashCode$cache";
         final String asmName = classNode.name;
         for (MethodNode methodNode: classNode.methods) {
@@ -109,18 +130,21 @@ public class MethodResultCacheOptimizer implements Opcodes {
             boolean shouldResetHash = false;
             for (AbstractInsnNode insnNode : insnList) {
                 if (insnNode.getOpcode() == PUTFIELD &&
-                        ((FieldInsnNode) insnNode).owner.equals(asmName)) {
+                        (((FieldInsnNode) insnNode).owner.equals(asmName) ||
+                                ((FieldInsnNode) insnNode).owner.equals(superAsm) ||
+                                ((FieldInsnNode) insnNode).owner.equals(optionalSuper))) {
                     shouldResetHash = true;
                     break;
                 }
             }
             if (shouldResetHash) { // prepend hash reset to the method if needed
-                insnList.insert(new FieldInsnNode(PUTFIELD, asmName, fName, "I"));
+                insnList.insert(new FieldInsnNode(PUTFIELD, superEdit ? superAsm : asmName, fName, "I"));
                 insnList.insert(new InsnNode(ICONST_0));
                 insnList.insert(new VarInsnNode(ALOAD, 0));
+                didWork = true;
             }
         }
-        return true;
+        return didWork;
     }
 
     public static void cacheMethodResult(ClassNode classNode, MethodNode methodNode) {
@@ -132,7 +156,7 @@ public class MethodResultCacheOptimizer implements Opcodes {
         if (resultDesc.equals(resultSign)) resultSign = null;
         final String fName = methodNode.name + "$cache";
         boolean isStatic = (methodNode.access & ACC_STATIC) != 0;
-        classNode.fields.add(new FieldNode(ACC_PUBLIC|(methodNode.access & ACC_STATIC), fName, resultDesc, resultSign, null));
+        classNode.fields.add(new FieldNode(ACC_SYNTHETIC|ACC_PUBLIC|(methodNode.access & ACC_STATIC), fName, resultDesc, resultSign, null));
         final int RETURN_OPCODE = resultDesc.length() == 1 ? IRETURN : ARETURN;
         final int UNSET_OPCODE = resultDesc.length() == 1 ? IFEQ : IFNULL;
         InsnList begin = new InsnList();

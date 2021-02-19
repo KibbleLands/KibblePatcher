@@ -1,5 +1,6 @@
 package net.kibblelands.patcher;
 
+import net.kibblelands.patcher.serverclip.ServerClipSupport;
 import net.kibblelands.patcher.utils.ConsoleColors;
 import net.kibblelands.patcher.utils.IOUtils;
 import net.kibblelands.patcher.utils.logger.Logger;

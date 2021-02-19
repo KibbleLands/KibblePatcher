@@ -49,6 +49,18 @@ public class IOUtils {
         return lines;
     }
 
+    public static byte[] readAllBytes(InputStream inputStream) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        byte[] buffer = new byte[2048];
+        int nRead;
+        baos.reset();
+        while ((nRead = inputStream.read(buffer, 0, buffer.length)) != -1) {
+            baos.write(buffer, 0, nRead);
+        }
+        inputStream.close();
+        return baos.toByteArray();
+    }
+
     public static Map<String,byte[]> readZIP(final InputStream in) throws IOException {
         ZipInputStream inputStream = new ZipInputStream(in);
         Map<String,byte[]> items = new HashMap<>();
@@ -93,5 +105,43 @@ public class IOUtils {
         }
         zip.flush();
         zip.close();
+    }
+
+    public static String trimJSON(String str) {
+        StringBuilder stringBuilder = new StringBuilder();
+        int index = 0;
+        boolean inString = false, special = false;
+        while (index < str.length()) {
+            char next = str.charAt(index);
+            if (inString) {
+                if (special) {
+                    special = false;
+                } else if (next == '\\') {
+                    special = true;
+                } else if (next == '\"') {
+                    inString = false;
+                }
+            } else {
+                if (next == '\"') {
+                    inString = true;
+                }
+                switch (next) {
+                    default:
+                        break;
+                    case '\"':
+                        inString = true;
+                        break;
+                    case ' ':
+                    case '\n':
+                    case '\r':
+                    case '\t':
+                        index++;
+                        continue;
+                }
+            }
+            stringBuilder.append(next);
+            index++;
+        }
+        return stringBuilder.toString();
     }
 }

@@ -3,6 +3,7 @@ package net.kibblelands.patcher;
 import net.kibblelands.patcher.ext.ForEachRemover;
 import net.kibblelands.patcher.patches.*;
 import net.kibblelands.patcher.rebuild.ClassDataProvider;
+import net.kibblelands.patcher.serverclip.ServerClipSupport;
 import net.kibblelands.patcher.utils.*;
 import net.kibblelands.patcher.utils.logger.Logger;
 import org.objectweb.asm.*;
@@ -35,7 +36,7 @@ public class KibblePatcher implements Opcodes {
     private static final String BUKKIT_VERSION_COMMAND = "org/bukkit/command/defaults/VersionCommand.class";
     private static final String PAPER_JVM_CHECKER_OLD = "com/destroystokyo/paper/util/PaperJvmChecker.class";
     private static final String PAPER_JVM_CHECKER = "io/papermc/paper/util/PaperJvmChecker.class";
-    public static final String KIBBLE_VERSION = "1.6.0";
+    public static final String KIBBLE_VERSION = "1.6.1";
     // Enable dev warnings if the version contains "-dev"
     @SuppressWarnings("ALL")
     public static final boolean DEV_BUILD = KIBBLE_VERSION.contains("-dev");
@@ -369,7 +370,8 @@ public class KibblePatcher implements Opcodes {
                                 entry.getKey().startsWith("net/minecraft/server/")
                                         ? null : MathHelper, stats, accessPkg);
                     } else if (entry.getKey().equals("pack.mcmeta") || entry.getKey().endsWith(".json")) {
-                        trimJSON(entry);
+                        entry.setValue(IOUtils.trimJSON(new String(entry.getValue(),
+                                StandardCharsets.UTF_8)).getBytes(StandardCharsets.UTF_8));
                     }
                 }
             }
@@ -808,46 +810,6 @@ public class KibblePatcher implements Opcodes {
             }, 0);
             p.setValue(classWriter.toByteArray());
         }
-    }
-
-    public static void trimJSON(Map.Entry<String, byte[]> p) {
-        byte[] bytes = p.getValue();
-        String str = new String(bytes, StandardCharsets.UTF_8);
-        StringBuilder stringBuilder = new StringBuilder();
-        int index = 0;
-        boolean inString = false, special = false;
-        while (index < str.length()) {
-            char next = str.charAt(index);
-            if (inString) {
-                if (special) {
-                    special = false;
-                } else if (next == '\\') {
-                    special = true;
-                } else if (next == '\"') {
-                    inString = false;
-                }
-            } else {
-                if (next == '\"') {
-                    inString = true;
-                }
-                switch (next) {
-                    default:
-                        break;
-                    case '\"':
-                        inString = true;
-                        break;
-                    case ' ':
-                    case '\n':
-                    case '\r':
-                    case '\t':
-                        index++;
-                        continue;
-                }
-            }
-            stringBuilder.append(next);
-            index++;
-        }
-        p.setValue(stringBuilder.toString().getBytes(StandardCharsets.UTF_8));
     }
 
     public Logger getLogger() {
