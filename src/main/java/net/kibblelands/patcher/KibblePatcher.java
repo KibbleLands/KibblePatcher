@@ -36,7 +36,7 @@ public class KibblePatcher implements Opcodes {
     private static final String BUKKIT_VERSION_COMMAND = "org/bukkit/command/defaults/VersionCommand.class";
     private static final String PAPER_JVM_CHECKER_OLD = "com/destroystokyo/paper/util/PaperJvmChecker.class";
     private static final String PAPER_JVM_CHECKER = "io/papermc/paper/util/PaperJvmChecker.class";
-    public static final String KIBBLE_VERSION = "1.6.1";
+    public static final String KIBBLE_VERSION = "1.6.2";
     // Enable dev warnings if the version contains "-dev"
     @SuppressWarnings("ALL")
     public static final boolean DEV_BUILD = KIBBLE_VERSION.contains("-dev");
@@ -115,9 +115,11 @@ public class KibblePatcher implements Opcodes {
         // As if a plugin made for KibblePatcher detect it it might use APIs not available in the partial
         // version, the dynamic package is also here to discourage the use of these APIs in lite mode
         boolean isBuiltInPatched = (!this.builtInMode) &&
-                manifest.getMainAttributes().containsKey("Kibble-BuiltIn") ||
-                // Kept for backward compatibility reasons
-                manifest.getMainAttributes().containsKey("Kibble-Yatopia");
+                manifest.getMainAttributes().containsKey("Kibble-BuiltIn");
+        boolean isRewriteInstalled = (!this.builtInMode) && (
+                manifest.getMainAttributes().containsKey("Kibble-Rewrite") ? (
+                        "BUILT-IN".equals(manifest.getMainAttributes().getValue("Kibble-Rewrite"))
+                ) : isBuiltInPatched);
         String StringUtil = null;
         if (srv.containsKey("org/apache/commons/lang/StringUtils.class")) {
             StringUtil = "org/apache/commons/lang/StringUtils";
@@ -167,7 +169,7 @@ public class KibblePatcher implements Opcodes {
                 "org/bukkit/craftbukkit/libs/" + "abcdef".charAt(accessPkgRnd.nextInt(6)) +
                         UUID.randomUUID().toString().replace("-", "").substring(0, accessPkgRnd.nextInt(32)) + "/";
         // CommonGenerator is only available if features patches are enabled
-        CommonGenerator commonGenerator = new CommonGenerator(NMS, this.featuresPatches && !this.builtInMode);
+        CommonGenerator commonGenerator = new CommonGenerator(NMS, this.featuresPatches, this.builtInMode);
         ClassDataProvider classDataProvider = new ClassDataProvider(KibblePatcher.class.getClassLoader());
         classDataProvider.addClasses(srv);
         System.gc(); // Clean memory
@@ -228,9 +230,11 @@ public class KibblePatcher implements Opcodes {
                 ChunkCacheOptimizer.patch(commonGenerator, srv, stats);
                 MethodResultCacheOptimizer.patch(commonGenerator, srv, stats);
                 BlockDataOptimiser.patch(commonGenerator, srv, stats);
-                PluginRewriteOptimiser.patch(commonGenerator, srv, inject, accessPkg, plRewrite);
-                NMSAccessOptimizer.patch(commonGenerator, srv);
             }
+            if (!isRewriteInstalled) {
+                PluginRewriteOptimiser.patch(commonGenerator, srv, inject, accessPkg, plRewrite);
+            }
+            NMSAccessOptimizer.patch(commonGenerator, srv);
             // Add features patches
             if (featuresPatches) {
                 DataCommandFeature.install(commonGenerator, srv, stats);
@@ -240,7 +244,7 @@ public class KibblePatcher implements Opcodes {
             }
             // Save in the jar if plugin rewrite is supported/installed
             manifest.getMainAttributes().putValue("Kibble-Rewrite",
-                    isBuiltInPatched?"BUILT-IN":plRewrite[0]?"INSTALLED":"UNSUPPORTED");
+                    isRewriteInstalled?"BUILT-IN":plRewrite[0]?"INSTALLED":"UNSUPPORTED");
         } else {
             // Add features in lib mode
             if (featuresPatches) {
@@ -426,6 +430,8 @@ public class KibblePatcher implements Opcodes {
                 logger.info("  Optimised forEach: " + ConsoleColors.CYAN + stats[6]);
             }
         }
+        System.out.println();
+        printSupportLinks(logger);
     }
 
     public static void patchZIP(final InputStream in, final OutputStream out, Manifest manifest, Map<String, byte[]> patch, Map<String, byte[]> inject) throws IOException {
@@ -814,5 +820,15 @@ public class KibblePatcher implements Opcodes {
 
     public Logger getLogger() {
         return logger;
+    }
+
+    public static final String GITHUB_CREATE_ISSUE = "https://github.com/KibbleLands/KibblePatcher/issues/new";
+    public static final String DISCORD_JOIN_LINK = "https://discord.gg/qgk4Saq";
+
+    public static void printSupportLinks(Logger logger) {
+        logger.info("If you find any bug report them here ->\n" +
+                ConsoleColors.CYAN + "    " + GITHUB_CREATE_ISSUE);
+        logger.info("Or you join our Discord server here ->\n" +
+                ConsoleColors.CYAN + "    " + DISCORD_JOIN_LINK);
     }
 }

@@ -15,11 +15,12 @@ public class CommonGenerator {
     private final List<String> changes;
 
     private final String NMS;
-    private final boolean features;
+    private final boolean features, builtIn;
 
-    public CommonGenerator(String NMS,boolean features) {
+    public CommonGenerator(String NMS,boolean features,boolean builtIn) {
         this.NMS = NMS;
         this.features = features;
+        this.builtIn = builtIn;
         this.changes = new LinkedList<>();
     }
 
@@ -36,7 +37,7 @@ public class CommonGenerator {
     }
 
     void generate(Map<String,byte[]> inject, Map<String,byte[]> srv) {
-        if (this.features) {
+        if (!this.builtIn) {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             PrintStream printStream = new PrintStream(baos);
             for (String change: this.changes) {

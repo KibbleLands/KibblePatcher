@@ -37,12 +37,17 @@ public final class Main {
                 generate = true;
             }
         }
+        if (args.length == 1 && args[0].equals("-links")) {
+            KibblePatcher.printSupportLinks(LOGGER);
+            return;
+        }
         if (args.length != 2) {
             LOGGER.stdout("Usage: \n" +
                     "    java -jar KibblePatcher.jar <input> <output>\n" +
                     "    java -jar KibblePatcher.jar -generate <input> <output>\n" +
                     "    java -jar KibblePatcher.jar -patch <file>\n" +
-                    "    java -jar KibblePatcher.jar -info <file>\n");
+                    "    java -jar KibblePatcher.jar -info <file>\n"+
+                    "    java -jar KibblePatcher.jar -links\n");
             System.exit(1);
             return;
         }
@@ -107,6 +112,9 @@ public final class Main {
                     pluginRewrite = "BUILT-IN";
                 }
                 if (version == null && versionBuiltIn == null) {
+                    if (pluginRewrite != null && !pluginRewrite.equals("UNSUPPORTED") ) {
+                        LOGGER.info("Plugin rewrite: " + ConsoleColors.CYAN + pluginRewrite);
+                    }
                     LOGGER.info("This " + (serverClipSupport != null ?
                             serverClipSupport.getName().toLowerCase() + " " : "") +
                             "server hasn't been patched by KibblePatcher yet.");
@@ -159,7 +167,12 @@ public final class Main {
             kibblePatcher.builtInPkg = builtInPkg;
             kibblePatcher.builtInModeRewrite = builtInModeRewrite;
         }
-        kibblePatcher.patchServerJar(in, new File(args[1]));
-        System.exit(0);
+        try {
+            kibblePatcher.patchServerJar(in, new File(args[1]));
+            System.exit(0);
+        } catch (Exception e) {
+            KibblePatcher.printSupportLinks(LOGGER);
+            throw e;
+        }
     }
 }
