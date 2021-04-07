@@ -13,6 +13,6 @@ public class KibbleOutputStream extends JarOutputStream {
         super(out, man);
         super.setMethod(ZipOutputStream.DEFLATED);
         super.setLevel(9); // Max compression
-        super.def.setStrategy(Deflater.NO_FLUSH);
+        super.def.setStrategy(Deflater.DEFAULT_STRATEGY);
     }
 }

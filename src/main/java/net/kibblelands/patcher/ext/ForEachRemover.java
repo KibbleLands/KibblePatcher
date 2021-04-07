@@ -141,6 +141,16 @@ public class ForEachRemover implements Opcodes {
                         targetOpcode == INVOKEINTERFACE
                 ));
 
+                // Original implementation doesn't expect method to have a return value
+                switch (Type.getMethodType(targetHandle.getDesc()).getReturnType().getSize()) {
+                    case 2:
+                        patch.add(new InsnNode(POP2));
+                        break;
+                    case 1:
+                        patch.add(new InsnNode(POP));
+                    case 0:
+                }
+
                 // }
                 patch.add(new JumpInsnNode(GOTO, continueNode));
                 patch.add(breakNode);

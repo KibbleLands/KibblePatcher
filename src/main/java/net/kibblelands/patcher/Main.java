@@ -171,6 +171,7 @@ public final class Main {
             kibblePatcher.patchServerJar(in, new File(args[1]));
             System.exit(0);
         } catch (Exception e) {
+            LOGGER.error("Oops, something went wrong!");
             KibblePatcher.printSupportLinks(LOGGER);
             throw e;
         }

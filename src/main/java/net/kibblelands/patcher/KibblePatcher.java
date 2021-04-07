@@ -14,6 +14,7 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.*;
+import java.util.concurrent.CancellationException;
 import java.util.jar.Attributes;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
@@ -36,7 +37,8 @@ public class KibblePatcher implements Opcodes {
     private static final String BUKKIT_VERSION_COMMAND = "org/bukkit/command/defaults/VersionCommand.class";
     private static final String PAPER_JVM_CHECKER_OLD = "com/destroystokyo/paper/util/PaperJvmChecker.class";
     private static final String PAPER_JVM_CHECKER = "io/papermc/paper/util/PaperJvmChecker.class";
-    public static final String KIBBLE_VERSION = "1.6.2";
+    private static final CancellationException SKIP = new CancellationException();
+    public static final String KIBBLE_VERSION = "1.6.3";
     // Enable dev warnings if the version contains "-dev"
     @SuppressWarnings("ALL")
     public static final boolean DEV_BUILD = KIBBLE_VERSION.contains("-dev");
@@ -192,7 +194,7 @@ public class KibblePatcher implements Opcodes {
                 attributes.putValue("Sealed", "true");
                 manifest.getEntries().put("net/minecraft/server/", attributes);
             }
-            // Patch 20 seconds delay to 5 seconds delay
+            // Patch the 10/20 seconds delay to a 5 seconds delay
             srv.put(CRAFT_BUKKIT_MAIN, patchDelayer(commonGenerator, srv.get(CRAFT_BUKKIT_MAIN)));
             // Patch Server Brand / VersionCommand
             String NMS_SERVER = "net/minecraft/server/" + NMS + "/MinecraftServer.class";
@@ -366,16 +368,23 @@ public class KibblePatcher implements Opcodes {
         srv.values().removeIf(Objects::isNull); // Clean null elements
         if (!libraryMode) {
             if (!isBuiltInPatched) {
-                for (Map.Entry<String, byte[]> entry : srv.entrySet()) {
-                    if (entry.getKey().endsWith(".class")) {
-                        patchClassOpt(entry, classDataProvider, fast_util_prefix == null ||
-                                        entry.getKey().startsWith(fast_util_prefix) ? null : fast_util_prefix,
-                                entry.getKey().startsWith("org/apache/commons/math3/") ||
-                                entry.getKey().startsWith("net/minecraft/server/")
-                                        ? null : MathHelper, stats, accessPkg);
-                    } else if (entry.getKey().equals("pack.mcmeta") || entry.getKey().endsWith(".json")) {
-                        entry.setValue(IOUtils.trimJSON(new String(entry.getValue(),
-                                StandardCharsets.UTF_8)).getBytes(StandardCharsets.UTF_8));
+                Iterator<Map.Entry<String, byte[]>> iterator = srv.entrySet().iterator();
+                while (iterator.hasNext()) {
+                    Map.Entry<String, byte[]> entry = iterator.next();
+                    try {
+                        if (entry.getKey().endsWith(".class")) {
+                            patchClassOpt(entry, classDataProvider, fast_util_prefix == null ||
+                                            entry.getKey().startsWith(fast_util_prefix) ? null : fast_util_prefix,
+                                    entry.getKey().startsWith("org/apache/commons/math3/") ||
+                                            entry.getKey().startsWith("net/minecraft/server/")
+                                            ? null : MathHelper, stats, accessPkg);
+                        } else if (entry.getKey().equals("pack.mcmeta") || entry.getKey().endsWith(".json")) {
+                            entry.setValue(IOUtils.trimJSON(new String(entry.getValue(),
+                                    StandardCharsets.UTF_8)).getBytes(StandardCharsets.UTF_8));
+                        }
+                    } catch (CancellationException c) {
+                        if (c != SKIP) throw c;
+                        iterator.remove();
                     }
                 }
             }
@@ -434,7 +443,7 @@ public class KibblePatcher implements Opcodes {
         printSupportLinks(logger);
     }
 
-    public static void patchZIP(final InputStream in, final OutputStream out, Manifest manifest, Map<String, byte[]> patch, Map<String, byte[]> inject) throws IOException {
+    public void patchZIP(final InputStream in, final OutputStream out, Manifest manifest, Map<String, byte[]> patch, Map<String, byte[]> inject) throws IOException {
         ZipInputStream inputStream = new ZipInputStream(in);
         KibbleOutputStream zip = new KibbleOutputStream(out, manifest);
         zip.setComment("Patched by Kibble "+KIBBLE_VERSION.replace('_', ' '));
@@ -444,31 +453,40 @@ public class KibblePatcher implements Opcodes {
             if (entry.getName().equals(JarFile.MANIFEST_NAME) || (entry.getName().startsWith("javax/annotation/") && entry.getName().endsWith(".java"))) {
                 continue;
             }
-            entry.setMethod(ZipOutputStream.DEFLATED);
-            if (entry.isDirectory()) {
-                // Yatopia can have duplicate dir entries
-                try {
-                    zip.putNextEntry(entry);
-                } catch (ZipException zipException) {
-                    if (!zipException.getMessage().startsWith("duplicate entry: ")) {
-                        throw zipException;
+            // Yatopia can have duplicate zip entries
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            try {
+                // We need to check actual size of entries, because directories can contain data
+                if (entry.isDirectory() && entry.getSize() == 0) {
+                    zip.putNextEntry(entry); // Store directories as-is
+                } else {
+                    // Support data directories
+                    byte[] data = entry.isDirectory() ? null : patch.get(entry.getName());
+                    if (data != null) {
+                        // We can't reuse a ZipEntry instance if the entry isn't fully read
+                        entry = new ZipEntry(entry);
                     } else {
-                        continue;
+                        baos.reset();
+                        int nRead;
+                        while ((nRead = inputStream.read(buffer, 0, buffer.length)) != -1) {
+                            baos.write(buffer, 0, nRead);
+                        }
+                        data = baos.toByteArray();
                     }
+
+                    entry.setMethod(ZipOutputStream.DEFLATED);
+                    entry.setCompressedSize(-1);
+                    entry.setSize(data.length);
+                    zip.putNextEntry(entry);
+                    zip.write(data);
                 }
-            } else {
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                int nRead;
-                while ((nRead = inputStream.read(buffer, 0, buffer.length)) != -1) {
-                    baos.write(buffer, 0, nRead);
+                zip.closeEntry();
+            } catch (ZipException zipException) {
+                if (!zipException.getMessage().startsWith("duplicate entry: ")) {
+                    throw zipException;
                 }
-                byte[] data = patch.getOrDefault(entry.getName(), baos.toByteArray());
-                entry.setCompressedSize(-1);
-                entry.setSize(data.length);
-                zip.putNextEntry(entry);
-                zip.write(data);
+                this.logger.warn("Deduplicated zip entry: " + entry.getName());
             }
-            zip.closeEntry();
         }
         for (Map.Entry<String, byte[]> toInject:inject.entrySet()) {
             entry = new ZipEntry(toInject.getKey());
@@ -634,16 +652,20 @@ public class KibblePatcher implements Opcodes {
         return classWriter.toByteArray();
     }
 
+    private static final int FIRST_PASS = 0;
+    private static final int FATAL_ERROR = 1;
+    private static final int NON_FATAL_ERROR = 2;
+
     public void patchClassOpt(Map.Entry<String, byte[]> p,ClassDataProvider cdp, String fast_util_prefix,
                               String Math,final int[] stats,String accessPkg) throws IOException {
-        patchClassOpt(p, cdp,fast_util_prefix, Math, stats, false, accessPkg);
+        patchClassOpt(p, cdp,fast_util_prefix, Math, stats, FIRST_PASS, accessPkg);
     }
 
     private static final String replaceDesc =
             "(Ljava/lang/String;Ljava/lang/CharSequence;Ljava/lang/CharSequence;)Ljava/lang/String;";
 
     private void patchClassOpt(final Map.Entry<String, byte[]> p,ClassDataProvider cdp, String fast_util_prefix,
-                               String Math, final int[] stats,final boolean err,final String accessPkg) throws IOException {
+                               String Math, final int[] stats,final int err,final String accessPkg) throws IOException {
         boolean[] requireCalc_dontOptimise = new boolean[]{false, false};
         ClassReader classReader = new ClassReader(p.getValue());
         ClassNode classNode = new ClassNode();
@@ -788,8 +810,14 @@ public class KibblePatcher implements Opcodes {
             }
         });
 
-        if (err) {
-            Files.write(new File("malformed.class").toPath(), classWriter.toByteArray());
+        if (err != FIRST_PASS) {
+            if (err == NON_FATAL_ERROR) {
+                Files.write(new File("malformed.nf.class").toPath(), classWriter.toByteArray());
+                this.logger.warn("Extracted 'malformed.nf.class', please send your server-jar alongside with the generated file.");
+            } else {
+                Files.write(new File("malformed.class").toPath(), classWriter.toByteArray());
+                this.logger.error("Extracted 'malformed.class', please send your server-jar alongside with the generated file.");
+            }
         } else {
             if (requireCalc_dontOptimise[1]) {
                 return;
@@ -805,10 +833,16 @@ public class KibblePatcher implements Opcodes {
                             try {
                                 super.visitMaxs(maxStack, maxLocals);
                             } catch (Throwable t) {
+                                boolean fatal = !(m_name.startsWith("junit/") || m_name.startsWith("com/mysql/"));
                                 try {
-                                    patchClassOpt(p, cdp, fast_util_prefix, Math, stats, true, accessPkg);
+                                    patchClassOpt(p, cdp, fast_util_prefix, Math, stats, fatal ? FATAL_ERROR : NON_FATAL_ERROR, accessPkg);
                                 } catch (IOException ignored) {}
-                                throw new RuntimeException("Malformed method at " + p.getKey() + "#" + m_name + m_descriptor, t);
+                                if (fatal) {
+                                    throw new RuntimeException("Malformed method at " + p.getKey() + "#" + m_name + m_descriptor, t);
+                                } else {
+                                    logger.warn("Malformed method at " + p.getKey() + "#" + m_name + m_descriptor);
+                                    throw SKIP;
+                                }
                             }
                         }
                     };
@@ -822,7 +856,7 @@ public class KibblePatcher implements Opcodes {
         return logger;
     }
 
-    public static final String GITHUB_CREATE_ISSUE = "https://github.com/KibbleLands/KibblePatcher/issues/new";
+    public static final String GITHUB_CREATE_ISSUE = "https://github.com/KibbleLands/KibblePatcher/issues/new/choose";
     public static final String DISCORD_JOIN_LINK = "https://discord.gg/qgk4Saq";
 
     public static void printSupportLinks(Logger logger) {

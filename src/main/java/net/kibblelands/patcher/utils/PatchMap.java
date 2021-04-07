@@ -36,7 +36,8 @@ public class PatchMap<K,V> extends AbstractMap<K,V> implements Map<K,V> {
 
     @Override
     public V get(Object key) {
-        return this.patch.getOrDefault(key, orig.get(key));
+        V value = this.patch.get(key);
+        return value != null ? value : orig.get(key);
     }
 
     @Override
@@ -102,7 +103,7 @@ public class PatchMap<K,V> extends AbstractMap<K,V> implements Map<K,V> {
                     if (latest == null) {
                         throw new IllegalStateException();
                     }
-                    latest.setValue(null);
+                    latest.restore();
                 }
             };
         }
@@ -151,6 +152,10 @@ public class PatchMap<K,V> extends AbstractMap<K,V> implements Map<K,V> {
             cachedValue = value;
             patch.put(origEntry.getKey(), value);
             return oldValue;
+        }
+
+        private void restore() {
+            patch.remove(origEntry.getKey());
         }
 
         public int hashCode() {

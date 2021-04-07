@@ -69,7 +69,7 @@ public class IOUtils {
         byte[] buffer = new byte[2048];
         int nRead;
         while (null!=(entry=inputStream.getNextEntry())) {
-            if (!entry.isDirectory()) {
+            if (!entry.isDirectory() && !items.containsKey(entry.getName())) {
                 baos.reset();
                 while ((nRead = inputStream.read(buffer, 0, buffer.length)) != -1) {
                     baos.write(buffer, 0, nRead);
