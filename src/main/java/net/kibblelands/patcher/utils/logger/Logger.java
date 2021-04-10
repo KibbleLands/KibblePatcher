@@ -4,6 +4,7 @@ import net.kibblelands.patcher.utils.ConsoleColors;
 import org.fusesource.jansi.AnsiConsole;
 
 import java.io.PrintStream;
+import java.util.Locale;
 
 public class Logger {
     private static final String prefixUTF = "▶ ";
@@ -13,7 +14,7 @@ public class Logger {
     static {
         boolean supportUnicode = true;
         try {
-            if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            if (System.getProperty("os.name").toLowerCase(Locale.ENGLISH).contains("win")) {
                 AnsiConsole.systemInstall();
                 // Check windows UTF-8 support or if git/cygwin terminal
                 supportUnicode =

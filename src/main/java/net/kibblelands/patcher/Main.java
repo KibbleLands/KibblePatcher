@@ -9,6 +9,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.List;
+import java.util.Locale;
 import java.util.jar.Attributes;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
@@ -80,7 +81,7 @@ public final class Main {
                 System.exit(3);
                 return;
             }
-            LOGGER.info("Generating " + serverClipSupport.getName().toLowerCase() + " server...");
+            LOGGER.info("Generating " + serverClipSupport.getName().toLowerCase(Locale.ENGLISH) + " server...");
             File generated = serverClipSupport.patchServerClip(in);
             try {
                 Files.move(generated.toPath(), out.toPath());
@@ -116,7 +117,7 @@ public final class Main {
                         LOGGER.info("Plugin rewrite: " + ConsoleColors.CYAN + pluginRewrite);
                     }
                     LOGGER.info("This " + (serverClipSupport != null ?
-                            serverClipSupport.getName().toLowerCase() + " " : "") +
+                            serverClipSupport.getName().toLowerCase(Locale.ENGLISH) + " " : "") +
                             "server hasn't been patched by KibblePatcher yet.");
                     return;
                 }

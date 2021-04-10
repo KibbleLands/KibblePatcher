@@ -77,7 +77,7 @@ public class KibblePatcher implements Opcodes {
         }
         ServerClipSupport serverClipSupport = ServerClipSupport.getServerClipSupport(in);
         if (serverClipSupport != null) {
-            logger.info("Generating " + serverClipSupport.getName().toLowerCase() + " server...");
+            logger.info("Generating " + serverClipSupport.getName().toLowerCase(Locale.ENGLISH) + " server...");
             this.patchServerJar0(serverClipSupport.patchServerClip(in), out);
             ServerClipSupport.cleanServerClip();
         } else {
@@ -175,7 +175,7 @@ public class KibblePatcher implements Opcodes {
         ClassDataProvider classDataProvider = new ClassDataProvider(KibblePatcher.class.getClassLoader());
         classDataProvider.addClasses(srv);
         System.gc(); // Clean memory
-        logger.info("Pawtching jar..."); //////////////////////////////////////////////////////////////
+        logger.info("Patching jar..."); //////////////////////////////////////////////////////////////
         int[] stats = {0, 0, 0, 0, 0, 0, 0};
         // Patch Manifest
         manifest.getMainAttributes().putValue(this.builtInMode ? "Kibble-BuiltIn" : "Kibble-Version", KIBBLE_VERSION);
