@@ -10,7 +10,7 @@ import org.objectweb.asm.tree.*;
 
 import java.util.Map;
 
-public class AuthenticationHardening implements Opcodes {
+public class AuthentificationHardening implements Opcodes {
     private static final String LOGIN_LISTENER = "net/minecraft/server/$NMS/LoginListener";
     private static final String PACKET_AUTH = "net/minecraft/server/$NMS/PacketLoginInEncryptionBegin";
     private static final String BASE_COMPONENT = "net/minecraft/server/$NMS/IChatBaseComponent";
@@ -19,11 +19,10 @@ public class AuthenticationHardening implements Opcodes {
     private static final String INVALID_DATA_MESSAGE = "Unexpected custom data from client";
 
     public static void patch(CommonGenerator commonGenerator, Map<String, byte[]> map, final int[] stats) {
-        String NMS = commonGenerator.getNMS();
-        String loginListener = LOGIN_LISTENER.replace("$NMS", NMS);
-        String authPacket = PACKET_AUTH.replace("$NMS", NMS);
-        String baseComponent = BASE_COMPONENT.replace("$NMS", NMS);
-        String chatMessage = CHAT_MESSAGE.replace("$NMS", NMS);
+        String loginListener = commonGenerator.nms(LOGIN_LISTENER);
+        String authPacket = commonGenerator.nms(PACKET_AUTH);
+        String baseComponent = commonGenerator.nms(BASE_COMPONENT);
+        String chatMessage = commonGenerator.nms(CHAT_MESSAGE);
         String loginListenerCL = loginListener + ".class";
         if (!map.containsKey(authPacket + ".class")) {
             return;
@@ -76,7 +75,7 @@ public class AuthenticationHardening implements Opcodes {
         ClassWriter classWriter = new ClassWriter(0);
         classNode.accept(classWriter);
         map.put(loginListenerCL, classWriter.toByteArray());
-        commonGenerator.addChangeEntry("Hardened online mode authentication. " + ConsoleColors.CYAN + "(Security)");
+        commonGenerator.addChangeEntry("Hardened online mode authentification. " + ConsoleColors.CYAN + "(Security)");
         stats[5]++;
     }
 }

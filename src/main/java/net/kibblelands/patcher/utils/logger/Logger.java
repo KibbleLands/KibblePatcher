@@ -4,6 +4,7 @@ import net.kibblelands.patcher.utils.ConsoleColors;
 import org.fusesource.jansi.AnsiConsole;
 
 import java.io.PrintStream;
+import java.util.Locale;
 
 public class Logger {
     private static final String prefixUTF = "▶ ";
@@ -11,6 +12,7 @@ public class Logger {
     private static final String prefix;
 
     static {
+        Locale.setDefault(Locale.ENGLISH);
         boolean supportUnicode = true;
         try {
             if (System.getProperty("os.name").toLowerCase().contains("win")) {

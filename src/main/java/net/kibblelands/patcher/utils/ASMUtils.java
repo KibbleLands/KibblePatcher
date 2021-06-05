@@ -337,4 +337,38 @@ public class ASMUtils implements Opcodes {
     public static boolean supportRemoteDataEdit(Map<String, byte[]> map) {
         return map.containsKey("org/bukkit/entity/PiglinBrute.class"); // Test if at least 1.16.2
     }
+
+    // Note: Incomplete implementation, but enough for what we need it to do
+    public static String getOrGuessOwner(MethodInsnNode methodInsnNode) {
+        if (!methodInsnNode.owner.equals("java/lang/Object"))
+            return methodInsnNode.owner;
+        Type[] types = Type.getArgumentTypes(methodInsnNode.desc);
+        int takeFirst = types.length == 0 ? 0 : types.length == 1 ? types[0].getSize() : -1;
+        AbstractInsnNode prev = methodInsnNode.getPrevious();
+        if (prev == null || takeFirst == -1) return "java/lang/Object";
+        if (takeFirst != 0) {
+            int opcode = prev.getOpcode();
+            if (takeFirst == 2) {
+                if (opcode != DLOAD && opcode != LLOAD)
+                    return "java/lang/Object";
+            } else {
+                if (opcode != ALOAD && opcode != ILOAD
+                        && opcode != FLOAD && opcode != DUP)
+                    return "java/lang/Object";
+            }
+            prev = prev.getPrevious();
+            if (prev == null) return "java/lang/Object";
+        }
+        if (prev instanceof MethodInsnNode) {
+            Type type = Type.getReturnType(((MethodInsnNode) prev).desc);
+            return type.getSort() == Type.OBJECT ? type.getInternalName() : "java/lang/Object";
+        } else if (prev instanceof FieldInsnNode) {
+            if (prev.getOpcode() == PUTFIELD || prev.getOpcode() == PUTSTATIC)
+                return "java/lang/Object";
+            Type type = Type.getType(((FieldInsnNode) prev).desc);
+            return type.getSort() == Type.OBJECT ? type.getInternalName() : "java/lang/Object";
+        } else if (prev.getOpcode() == CHECKCAST) {
+            return ((TypeInsnNode) prev).desc;
+        } else return "java/lang/Object";
+    }
 }

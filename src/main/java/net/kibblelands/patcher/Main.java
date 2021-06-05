@@ -8,7 +8,10 @@ import net.kibblelands.patcher.utils.logger.Logger;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.Enumeration;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.jar.Attributes;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
@@ -22,6 +25,7 @@ public final class Main {
         boolean fullPatch = false;
         boolean generate = false;
         String builtInPkg = null;
+        String xlistFilter = "";
         if (args.length == 4 && ("-builtin-has-rewrite".equals(args[0]) ||
                 (builtInModeRewrite = "-builtin".equals(args[0])))) {
             args = new String[]{args[2], args[3]};
@@ -35,6 +39,9 @@ public final class Main {
             } else if (("-generate".equals(args[0]))) {
                 args = new String[]{args[1], args[2]};
                 generate = true;
+            } else if (("-xlist".equals(args[0]))) {
+                xlistFilter = args[2];
+                args = new String[]{args[0], args[1]};
             }
         }
         if (args.length == 1 && args[0].equals("-links")) {
@@ -95,7 +102,8 @@ public final class Main {
             System.exit(0);
             return;
         }
-        if (args[0].equals("-info")) {
+        boolean xlist = false;
+        if (args[0].equals("-info") || (xlist = args[0].equals("-xlist"))) {
             File in = new File(args[1]);
             if (!in.exists()) {
                 LOGGER.error("Input file doesn't exists!");
@@ -104,6 +112,24 @@ public final class Main {
             }
             ServerClipSupport serverClipSupport = ServerClipSupport.getServerClipSupport(in);
             try (JarFile jarFile = new JarFile(in)) {
+                {
+                    // Try to check zip special files first
+                    Enumeration<JarEntry> entryEnumeration = jarFile.entries();
+                    Set<String> set = new HashSet<>();
+                    while (entryEnumeration.hasMoreElements()) {
+                        JarEntry jarEntry = entryEnumeration.nextElement();
+                        if (!jarEntry.getName().startsWith(xlistFilter)) continue;
+                        boolean dup = !set.add(jarEntry.getName());
+                        boolean dataDir = jarEntry.isDirectory() && jarEntry.getSize() != 0;
+                        if (dup | dataDir) {
+                            LOGGER.warn((dup ? ("Duplicate " + (dataDir ?
+                                    "data directory: " : "entry: ")) : "Data directory: ") + jarEntry.getName());
+                        } else if (xlist && !jarEntry.isDirectory()) {
+                            LOGGER.info("Entry: " + jarEntry.getName());
+                        }
+                    }
+                }
+                if (xlist) return;
                 Attributes mainAttributes = jarFile.getManifest().getMainAttributes();
                 String version = mainAttributes.getValue("Kibble-Version");
                 String versionBuiltIn = mainAttributes.getValue("Kibble-BuiltIn");
@@ -161,6 +187,7 @@ public final class Main {
             kibblePatcher.featuresPatches = true;
         }
         if (builtInMode) {
+            LOGGER.warn("BuiltIn mode is deprecated, and no longer supported.");
             kibblePatcher.compatibilityPatches = false;
             kibblePatcher.featuresPatches = false;
             kibblePatcher.builtInMode = true;

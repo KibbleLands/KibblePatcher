@@ -6,7 +6,7 @@ plugins {
 }
 
 group 'org.example'
-version '1.6.3'
+version '1.6.4'
 
 targetCompatibility = '1.8'
 sourceCompatibility = '1.8'
@@ -14,6 +14,7 @@ sourceCompatibility = '1.8'
 repositories {
     mavenCentral()
     // Bukkit dependency
+    maven { url = 'https://repo.destroystokyo.com/repository/maven-public/' }
     maven { url = 'https://oss.sonatype.org/content/repositories/snapshots' }
     maven { url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
 }
@@ -50,11 +51,7 @@ dependencies {
     implementation 'org.fusesource.jansi:jansi:2.3.1'
     shadow 'org.fusesource.jansi:jansi:2.3.1'
     // Bukkit dependency (Only used in net.kibblelands.server.*)
-    compileOnly 'org.jetbrains:annotations:16.0.2'
-    compileOnly 'org.yaml:snakeyaml:1.27'
-    compileOnly('org.spigotmc:spigot-api:1.16.5-R0.1-SNAPSHOT') {
-        transitive = false
-    }
+    compileOnly('com.destroystokyo.paper:paper-api:1.16.5-R0.1-SNAPSHOT')
 }
 
 tasks.withType(JavaCompile) {

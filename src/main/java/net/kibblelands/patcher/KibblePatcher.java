@@ -35,18 +35,26 @@ public class KibblePatcher implements Opcodes {
     private static final String CRAFT_BUKKIT_MAIN = "org/bukkit/craftbukkit/Main.class";
     private static final String BUKKIT_API = "org/bukkit/Bukkit.class";
     private static final String BUKKIT_VERSION_COMMAND = "org/bukkit/command/defaults/VersionCommand.class";
-    private static final String PAPER_JVM_CHECKER_OLD = "com/destroystokyo/paper/util/PaperJvmChecker.class";
-    private static final String PAPER_JVM_CHECKER = "io/papermc/paper/util/PaperJvmChecker.class";
     private static final CancellationException SKIP = new CancellationException();
-    public static final String KIBBLE_VERSION = "1.6.3";
+    public static final String KIBBLE_VERSION = "1.6.4";
     // Enable dev warnings if the version contains "-dev"
     @SuppressWarnings("ALL")
     public static final boolean DEV_BUILD = KIBBLE_VERSION.contains("-dev");
+    /**
+     * KillSwitch for bugFixes patches
+     * Should not be disabled if possible
+     */
+    public boolean bugFixesPatches = true;
     /**
      * KillSwitch for compatibility patches
      * Can be disabled if your server doesn't require it
      */
     public boolean compatibilityPatches = true;
+    /**
+     * KillSwitch for security patches
+     * Should not be disabled if possible
+     */
+    public boolean securityPatches = true;
     /**
      * KillSwitch for external patches
      * Can be disabled to removes patch that fall under an unclear licence
@@ -57,18 +65,11 @@ public class KibblePatcher implements Opcodes {
      * Can be disabled if your server doesn't require it
      */
     public boolean featuresPatches = false;
-    /**
-     * Special mode for servers build process
-     * to only include KibblePatcher optimisations
-     */
+    @Deprecated // Will be removed in KP 1.7
     public boolean builtInMode = false;
-    /**
-     * Flag to tell if
-     */
+    @Deprecated // Will be removed in KP 1.7
     public boolean builtInModeRewrite = false;
-    /**
-     * Prefix of FastMath and FastReplace classes
-     */
+    @Deprecated // Will be removed in KP 1.7
     public String builtInPkg = "net/kibblelands/server/util/";
 
     public void patchServerJar(File in, File out) throws IOException {
@@ -175,13 +176,17 @@ public class KibblePatcher implements Opcodes {
         ClassDataProvider classDataProvider = new ClassDataProvider(KibblePatcher.class.getClassLoader());
         classDataProvider.addClasses(srv);
         System.gc(); // Clean memory
-        logger.info("Pawtching jar..."); //////////////////////////////////////////////////////////////
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        logger.info(ConsoleColors.GREEN_BOLD + "Paw" + ConsoleColors.GREEN + "tching jar..."); // Pawtching jar...
         int[] stats = {0, 0, 0, 0, 0, 0, 0};
         // Patch Manifest
         manifest.getMainAttributes().putValue(this.builtInMode ? "Kibble-BuiltIn" : "Kibble-Version", KIBBLE_VERSION);
         final boolean[] plRewrite = new boolean[]{false};
         if (this.builtInMode) {
             if (!libraryMode) {
+                if (bugFixesPatches) {
+                    NPECheckFixes.patch(commonGenerator, srv);
+                }
                 BlockDataOptimiser.patch(commonGenerator, srv, stats);
                 if (this.builtInModeRewrite) {
                     PluginRewriteOptimiser.patch(commonGenerator, srv, inject, this.builtInPkg, plRewrite);
@@ -205,15 +210,8 @@ public class KibblePatcher implements Opcodes {
             srv.put(CRAFT_SERVER, patchGC(srv.get(CRAFT_SERVER), "reload", stats));
             String NMS_DEDICATED_SERVER = "net/minecraft/server/" + NMS + "/DedicatedServer.class";
             srv.put(NMS_DEDICATED_SERVER, patchGC(srv.get(NMS_DEDICATED_SERVER), "init", stats));
-            if (this.featuresPatches) {
-                byte[] paperJvmCheck = srv.get(PAPER_JVM_CHECKER);
-                if (paperJvmCheck != null) {
-                    srv.put(PAPER_JVM_CHECKER, patchPaperJavaWarning(paperJvmCheck));
-                }
-                paperJvmCheck = srv.get(PAPER_JVM_CHECKER_OLD);
-                if (paperJvmCheck != null) {
-                    srv.put(PAPER_JVM_CHECKER_OLD, patchPaperJavaWarning(paperJvmCheck));
-                }
+            if (bugFixesPatches) {
+                NPECheckFixes.patch(commonGenerator, srv);
             }
             if (compatibilityPatches) {
                 // Add commonly used APIs on old plugins
@@ -225,8 +223,10 @@ public class KibblePatcher implements Opcodes {
                 BukkitVarTypeCompact.check(commonGenerator, srv, stats);
             }
             // Security patches
-            BookCrashFixer.patch(commonGenerator, srv, stats);
-            AuthenticationHardening.patch(commonGenerator, srv, stats);
+            if (securityPatches) {
+                BookCrashFixer.patch(commonGenerator, srv, stats);
+                AuthentificationHardening.patch(commonGenerator, srv, stats);
+            }
             // Specific optimisations
             if (!isBuiltInPatched) {
                 ChunkCacheOptimizer.patch(commonGenerator, srv, stats);
@@ -393,8 +393,11 @@ public class KibblePatcher implements Opcodes {
                 if (srv.get("configurations/bukkit.yml") != null) {
                     srv.put("configurations/bukkit.yml", new String(srv.get("configurations/bukkit.yml"), StandardCharsets.UTF_8)
                             .replace("query-plugins: true", "query-plugins: false")
-                            .replace("monster-spawns: 1", "monster-spawns: 2").replace("water-spawns: 1", "water-spawns: 2")
-                            .replace("ambient-spawns: 1", "ambient-spawns: 2").getBytes(StandardCharsets.UTF_8));
+                            .replace("period-in-ticks: 600", "period-in-ticks: 400")
+                            .replace("monster-spawns: 1", "monster-spawns: 5")
+                            .replace("water-spawns: 1", "water-spawns: 7")
+                            .replace("water-ambient-spawns: 1", "water-ambient-spawns: 20")
+                            .replace("ambient-spawns: 1", "ambient-spawns: 22").getBytes(StandardCharsets.UTF_8));
                 }
             }
             // Get stats in final jar
@@ -434,13 +437,19 @@ public class KibblePatcher implements Opcodes {
         } else {
             logger.info("Generic optimiser: ");
             logger.info("  Optimised java calls: " + ConsoleColors.CYAN + stats[1]);
-            logger.info("  Optimised opcodes: " + ConsoleColors.CYAN + stats[2]);
+            logger.info("  Optimised opcodes: " + ConsoleColors.CYAN + stats[2]); // Do we still count this?
             if (externalPatches) {
                 logger.info("  Optimised forEach: " + ConsoleColors.CYAN + stats[6]);
             }
         }
         System.out.println();
         printSupportLinks(logger);
+    }
+
+    private static boolean isTestCode(String path) { // Some server build system can include test code, remove that!
+        return path.startsWith("javassist/") || path.startsWith("org/reflections/") ||
+                path.startsWith("com/puppycrawl/tools/checkstyle/") ||
+                path.startsWith("junit/") || path.startsWith("org/junit/") || path.startsWith("org/hamcrest/");
     }
 
     public void patchZIP(final InputStream in, final OutputStream out, Manifest manifest, Map<String, byte[]> patch, Map<String, byte[]> inject) throws IOException {
@@ -450,7 +459,8 @@ public class KibblePatcher implements Opcodes {
         ZipEntry entry;
         byte[] buffer = new byte[2048];
         while (null!=(entry=inputStream.getNextEntry())) {
-            if (entry.getName().equals(JarFile.MANIFEST_NAME) || (entry.getName().startsWith("javax/annotation/") && entry.getName().endsWith(".java"))) {
+            if (entry.getName().equals(JarFile.MANIFEST_NAME) || isTestCode(entry.getName()) ||
+                    (entry.getName().startsWith("javax/annotation/") && entry.getName().endsWith(".java"))) {
                 continue;
             }
             // Yatopia can have duplicate zip entries
@@ -541,25 +551,6 @@ public class KibblePatcher implements Opcodes {
             commonGenerator.addChangeEntry("Reduced start delay when outdated to 5 seconds. " + ConsoleColors.CYAN + "(Productivity)");
         }
         return didWork[0] ? classWriter.toByteArray() : bytes;
-    }
-
-    public static byte[] patchPaperJavaWarning(byte[] bytes) {
-        ClassReader classReader = new ClassReader(bytes);
-        ClassNode classNode = new ClassNode();
-        classReader.accept(classNode, 0);
-        for (MethodNode methodNode:classNode.methods) {
-            if ((methodNode.name.equals("printWarning") ||
-                    methodNode.name.equals("checkJvm")) &&
-                    methodNode.desc.endsWith(")V")) {
-                methodNode.instructions.clear();
-                methodNode.instructions.add(new InsnNode(RETURN));
-                methodNode.tryCatchBlocks.clear();
-                methodNode.localVariables.clear();
-            }
-        }
-        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-        classNode.accept(classWriter);
-        return classWriter.toByteArray();
     }
 
     public static byte[] patchBrand(byte[] bytes,final boolean special) {
@@ -676,11 +667,14 @@ public class KibblePatcher implements Opcodes {
         ClassWriter classWriter = new ClassWriter(0);
 
         classNode.accept(new ClassVisitor(ASM_BUILD, classWriter) {
+            boolean isNMS;
+
             @Override
             public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
                 super.visit(version, access, name, signature, superName, interfaces);
                 requireCalc_dontOptimise[1] = (version < V1_6 && !name.startsWith("net/minecraft/server/")
                         && !(name.startsWith("org/bukkit/") && !name.startsWith("org/bukkit/craftbukkit/libs/")));
+                this.isNMS = name.startsWith("net/minecraft/server/") || name.startsWith("org/bukkit/craftbukkit/");
             }
 
             @Override
@@ -724,6 +718,13 @@ public class KibblePatcher implements Opcodes {
                             MethodInsnNode methodInsnNode;
                             if (previous == null) continue;
                             switch (insnNode.getOpcode()) {
+                                // Bytecode cleaning start
+                                case SWAP:
+                                    if (previous.getOpcode() == SWAP) {
+                                        insnNodes.remove(previous);
+                                        insnNodes.remove(insnNode);
+                                    }
+                                    break;
                                 case F2D:
                                     if (previous.getOpcode() == D2F) {
                                         insnNodes.remove(previous);
@@ -740,6 +741,10 @@ public class KibblePatcher implements Opcodes {
                                     if (previous.getOpcode() == DUP) {
                                         insnNodes.remove(previous);
                                         insnNodes.remove(insnNode);
+                                    } else if (previous.getOpcode() == DUP_X1) {
+                                        insnNodes.insert(insnNode, new InsnNode(SWAP));
+                                        insnNodes.remove(previous);
+                                        insnNodes.remove(insnNode);
                                     }
                                     break;
                                 case POP2:
@@ -748,6 +753,8 @@ public class KibblePatcher implements Opcodes {
                                         insnNodes.remove(insnNode);
                                     }
                                     break;
+                                // Bytecode cleaning end
+                                // Note: Bytecode cleaning is just here to make the bytecode smaller
                                 case INVOKESPECIAL:
                                     methodInsnNode = (MethodInsnNode) insnNode;
                                     if (methodInsnNode.desc.equals("()V") &&
@@ -761,8 +768,8 @@ public class KibblePatcher implements Opcodes {
                                     }
                                     break;
                                 case INVOKEINTERFACE:
+                                    methodInsnNode = (MethodInsnNode) insnNode;
                                     if (fast_util_prefix != null) {
-                                        methodInsnNode = (MethodInsnNode) insnNode;
                                         if (previous.getOpcode() == INVOKEINTERFACE && methodInsnNode.name.equals("iterator")
                                                 && methodInsnNode.owner.equals(fast_util_prefix + "objects/ObjectSet")) {
                                             methodInsnNode = (MethodInsnNode) previous;

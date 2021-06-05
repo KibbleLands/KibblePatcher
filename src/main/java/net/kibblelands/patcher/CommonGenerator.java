@@ -28,6 +28,10 @@ public class CommonGenerator {
         return NMS;
     }
 
+    public String nms(String text) {
+        return text.replace("$NMS", NMS);
+    }
+
     public boolean hasFeatures() {
         return features;
     }

@@ -11,6 +11,7 @@ public class RewriteEtc {
         methodsRedirects.put("java/lang/Math.sin(D)D", "net/kibblelands/server/util/FastMath");
         methodsRedirects.put("java/lang/Math.cos(D)D", "net/kibblelands/server/util/FastMath");
         methodsRedirects.put("java/lang/Math.tan(D)D", "net/kibblelands/server/util/FastMath");
+        System.getProperties().put(RewriteEtc.class, methodsRedirects); // Sneaky fox
     }
 
     public static String rewriteOwner(String owner,String name,String desc) {
