@@ -15,7 +15,6 @@ public class InventoryCompact implements Opcodes {
     private static final String CUSTOM_INVENTORY = "org/bukkit/craftbukkit/$NMS/inventory/CraftInventoryCustom.class";
 
     public static void check(CommonGenerator commonGenerator,Map<String, byte[]> map, final int[] stats) {
-        String NMS = commonGenerator.getNMS();
         byte[] inv = map.get(INVENTORY);
         ClassReader classReader = new ClassReader(inv);
         ClassNode classNode = new ClassNode();
@@ -40,7 +39,7 @@ public class InventoryCompact implements Opcodes {
         ClassWriter classWriter = new ClassWriter(0);
         classNode.accept(classWriter);
         map.put(INVENTORY, classWriter.toByteArray());
-        classReader = new ClassReader(map.get(CUSTOM_INVENTORY.replace("$NMS", NMS)));
+        classReader = new ClassReader(map.get(commonGenerator.mapClass(CUSTOM_INVENTORY)));
         classNode = new ClassNode();
         classReader.accept(classNode, 0);
         classNode.methods.add(tmp = new MethodNode(ACC_PUBLIC|ACC_SYNTHETIC, "getTitle", "()Ljava/lang/String;", null, null));
@@ -49,13 +48,15 @@ public class InventoryCompact implements Opcodes {
         tmp.instructions.add(labelNode);
         tmp.instructions.add(new LineNumberNode(12345, labelNode));
         tmp.instructions.add(new VarInsnNode(ALOAD, 0));
-        tmp.instructions.add(new MethodInsnNode(INVOKEVIRTUAL, "org/bukkit/craftbukkit/"+NMS+"/inventory/CraftInventoryCustom", "getInventory", "()Lnet/minecraft/server/"+NMS+"/IInventory;", false));
-        tmp.instructions.add(new TypeInsnNode(CHECKCAST, "org/bukkit/craftbukkit/"+NMS+"/inventory/CraftInventoryCustom$MinecraftInventory"));
-        tmp.instructions.add(new MethodInsnNode(INVOKEVIRTUAL, "org/bukkit/craftbukkit/"+NMS+"/inventory/CraftInventoryCustom$MinecraftInventory", "getTitle", "()Ljava/lang/String;", false));
+        tmp.instructions.add(commonGenerator.mapMethodInsn(new MethodInsnNode(INVOKEVIRTUAL,
+                "org/bukkit/craftbukkit/$NMS/inventory/CraftInventoryCustom", "getInventory", "()Lnet/minecraft/server/$NMS/IInventory;", false)));
+        tmp.instructions.add(new TypeInsnNode(CHECKCAST, commonGenerator.mapClass("org/bukkit/craftbukkit/$NMS/inventory/CraftInventoryCustom$MinecraftInventory")));
+        tmp.instructions.add(commonGenerator.mapMethodInsn(new MethodInsnNode(INVOKEVIRTUAL,
+                "org/bukkit/craftbukkit/$NMS/inventory/CraftInventoryCustom$MinecraftInventory", "getTitle", "()Ljava/lang/String;", false)));
         tmp.instructions.add(new InsnNode(ARETURN));
         classWriter = new ClassWriter(0);
         classNode.accept(classWriter);
-        map.put(CUSTOM_INVENTORY.replace("$NMS", NMS), classWriter.toByteArray());
+        map.put(commonGenerator.mapClass(CUSTOM_INVENTORY), classWriter.toByteArray());
         commonGenerator.addChangeEntry("Added back the Inventory getName/getTitle API " + ConsoleColors.CYAN + "(Retro compatibility)");
         stats[3]++;
     }

@@ -12,12 +12,11 @@ public class DataCommandFeature implements Opcodes {
     private static final String entityHuman = "net/minecraft/server/$NMS/EntityHuman";
 
     public static void install(CommonGenerator commonGenerator,Map<String, byte[]> map, final int[] stats) {
-        String NMS = commonGenerator.getNMS();
-        String resolvedDataAccessorEntity = dataAccessorEntity.replace("$NMS", NMS);
+        String resolvedDataAccessorEntity = commonGenerator.mapClass(dataAccessorEntity);
         byte[] dataAccessorEntity = map.get(resolvedDataAccessorEntity);
         final boolean[] didWork = new boolean[]{false};
         if (dataAccessorEntity == null) return; // Doesn't exists (Skip)
-        final String asmEntityHuman = entityHuman.replace("$NMS", NMS);
+        final String asmEntityHuman = commonGenerator.mapClass(entityHuman);
         ClassWriter classWriter = new ClassWriter(0);
         new ClassReader(dataAccessorEntity).accept(new ClassVisitor(ASMUtils.ASM_BUILD, classWriter) {
             @Override

@@ -9,7 +9,7 @@ import java.util.*;
  * This map put alls modifications to a secondary Map
  * The goal is to get all modifications in a separate Map to apply them later
  */
-@SuppressWarnings("SuspiciousMethodCalls") // This class is a wrapper for 2 different maps
+@SuppressWarnings({"SuspiciousMethodCalls", "unchecked"}) // This class is a wrapper for 2 different maps
 public class PatchMap<K,V> extends AbstractMap<K,V> implements Map<K,V> {
     private final Map<K,V> orig, patch;
     private final TransformSet transformSet;

@@ -7,6 +7,7 @@ import javax.xml.bind.DatatypeConverter;
  * {@code javax.xml.bind.annotation.adapters.HexBinaryAdapter} is missing
  */
 @Deprecated
+@SuppressWarnings("deprecation")
 public class HexBinaryAdapter extends XmlAdapter<byte[], String> {
     @Override
     @Deprecated

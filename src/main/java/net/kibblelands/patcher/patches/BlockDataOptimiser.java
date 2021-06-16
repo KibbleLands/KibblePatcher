@@ -17,9 +17,8 @@ public class BlockDataOptimiser implements Opcodes {
 
     // Transform method call to field call to allow JIT to better optimise bytecode
     public static void patch(CommonGenerator commonGenerator,Map<String, byte[]> map, final int[] stats) {
-        final String NMS = commonGenerator.getNMS();
-        final String BLOCK = NMS_BLOCK.replace("$NMS", NMS);
-        final String BLOCK_DATA = NMS_BLOCK_DATA.replace("$NMS", NMS);
+        final String BLOCK = commonGenerator.mapClass(NMS_BLOCK);
+        final String BLOCK_DATA = commonGenerator.mapClass(NMS_BLOCK_DATA);
         if (!map.containsKey(BLOCK_DATA+".class")) {
             return; // No block data
         }
@@ -32,7 +31,7 @@ public class BlockDataOptimiser implements Opcodes {
                 if (value == null) {
                     value = fieldNode;
                 } else {
-                    wtf(NMS, "0x00");
+                    wtf(commonGenerator.getMapperInfo(), "0x00");
                     return; // WTF ?
                 }
             }
@@ -47,14 +46,14 @@ public class BlockDataOptimiser implements Opcodes {
                     if (getter == null) {
                         getter = methodNode;
                     } else {
-                        wtf(NMS, "0x01");
+                        wtf(commonGenerator.getMapperInfo(), "0x01");
                         return; // WTF ?
                     }
                 } else if (methodNode.desc.equals(setter_desc)) {
                     if (setter == null) {
                         setter = methodNode;
                     } else {
-                        wtf(NMS, "0x02");
+                        wtf(commonGenerator.getMapperInfo(), "0x02");
                         return; // WTF ?
                     }
                 }
@@ -64,7 +63,7 @@ public class BlockDataOptimiser implements Opcodes {
             int i = 2;
             if (getter == null) i+=1;
             if (setter == null) i+=1;
-            wtf(NMS, "0x0"+i);
+            wtf(commonGenerator.getMapperInfo(), "0x0"+i);
             return;
         }
         value.access = ACC_PUBLIC;

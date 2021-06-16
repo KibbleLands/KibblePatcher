@@ -1,6 +1,8 @@
 package net.kibblelands.patcher;
 
 import net.kibblelands.patcher.ext.ForEachRemover;
+import net.kibblelands.patcher.mapper.MojangMapper;
+import net.kibblelands.patcher.mapper.NMSMapper;
 import net.kibblelands.patcher.patches.*;
 import net.kibblelands.patcher.rebuild.ClassDataProvider;
 import net.kibblelands.patcher.serverclip.ServerClipSupport;
@@ -36,10 +38,11 @@ public class KibblePatcher implements Opcodes {
     private static final String BUKKIT_API = "org/bukkit/Bukkit.class";
     private static final String BUKKIT_VERSION_COMMAND = "org/bukkit/command/defaults/VersionCommand.class";
     private static final CancellationException SKIP = new CancellationException();
-    public static final String KIBBLE_VERSION = "1.6.4";
+    public static final String KIBBLE_VERSION = "1.7-dev01";
     // Enable dev warnings if the version contains "-dev"
     @SuppressWarnings("ALL")
-    public static final boolean DEV_BUILD = KIBBLE_VERSION.contains("-dev");
+    public static final boolean DEV_BUILD = KIBBLE_VERSION.contains("-dev") ||
+            KIBBLE_VERSION.contains("-pre") || KIBBLE_VERSION.contains("-rc");
     /**
      * KillSwitch for bugFixes patches
      * Should not be disabled if possible
@@ -65,12 +68,6 @@ public class KibblePatcher implements Opcodes {
      * Can be disabled if your server doesn't require it
      */
     public boolean featuresPatches = false;
-    @Deprecated // Will be removed in KP 1.7
-    public boolean builtInMode = false;
-    @Deprecated // Will be removed in KP 1.7
-    public boolean builtInModeRewrite = false;
-    @Deprecated // Will be removed in KP 1.7
-    public String builtInPkg = "net/kibblelands/server/util/";
 
     public void patchServerJar(File in, File out) throws IOException {
         if (DEV_BUILD) {
@@ -87,7 +84,7 @@ public class KibblePatcher implements Opcodes {
     }
 
     private void patchServerJar0(File in, File out) throws IOException {
-        final boolean special = ((!this.featuresPatches) || (!this.compatibilityPatches) || this.builtInMode);
+        final boolean special = ((!this.featuresPatches) || (!this.compatibilityPatches));
         logger.info("Reading jar..."); //////////////////////////////////////////////////////////////
         byte[] origBytes = Files.readAllBytes(in.toPath());
         boolean javaZipMitigation = false;
@@ -117,12 +114,10 @@ public class KibblePatcher implements Opcodes {
         // This help plugins to prevent their behaviour from changing if KibblePatcher lite is present
         // As if a plugin made for KibblePatcher detect it it might use APIs not available in the partial
         // version, the dynamic package is also here to discourage the use of these APIs in lite mode
-        boolean isBuiltInPatched = (!this.builtInMode) &&
-                manifest.getMainAttributes().containsKey("Kibble-BuiltIn");
-        boolean isRewriteInstalled = (!this.builtInMode) && (
-                manifest.getMainAttributes().containsKey("Kibble-Rewrite") ? (
+        boolean isRewriteInstalled = (
+                manifest.getMainAttributes().containsKey("Kibble-Rewrite") && (
                         "BUILT-IN".equals(manifest.getMainAttributes().getValue("Kibble-Rewrite"))
-                ) : isBuiltInPatched);
+                ));
         String StringUtil = null;
         if (srv.containsKey("org/apache/commons/lang/StringUtils.class")) {
             StringUtil = "org/apache/commons/lang/StringUtils";
@@ -133,10 +128,10 @@ public class KibblePatcher implements Opcodes {
         } else if (srv.containsKey("org/bukkit/craftbukkit/libs/org/apache/commons/lang3/StringUtils.class")) {
             StringUtil = "org/bukkit/craftbukkit/libs/org/apache/commons/lang3/StringUtils";
         }
-        String MathHelper = null;
+        String CraftServer = null;
         for (String entry:srv.keySet()) {
             if (entry.startsWith("net/minecraft/server/") && entry.endsWith("/MathHelper.class")) {
-                MathHelper = entry.substring(0, entry.length() - 6);
+                CraftServer = entry.substring(0, entry.length() - 6);
                 break;
             }
         }
@@ -147,17 +142,14 @@ public class KibblePatcher implements Opcodes {
                 "org/bukkit/craftbukkit/libs/it/unimi/dsi/fastutil/objects/Object2BooleanOpenHashMap.class")) {
             fast_util_prefix = "org/bukkit/craftbukkit/libs/it/unimi/dsi/fastutil/";
         }
-        if (compatibilityPatches && !javaZipMitigation && MathHelper == null
+        if (compatibilityPatches && !javaZipMitigation && CraftServer == null
                 && srv.get(CRAFT_BUKKIT_MAIN) == null && srv.get(BUKKIT_API) != null) {
-            if (this.builtInMode) {
-                throw new Error("BuiltIn mode is incompatible with library patching!");
-            }
             logger.warn("API Patching mode! (Optimisations disabled)");
             logger.warn("Warning: API Patching mode is not officially supported!");
             libraryMode = true;
-        } else if (MathHelper == null || srv.get(CRAFT_BUKKIT_MAIN) == null) {
+        } else if (CraftServer == null || srv.get(CRAFT_BUKKIT_MAIN) == null) {
             logger.error("Server is not a valid spigot server!");
-            if (MathHelper == null) {
+            if (CraftServer == null) {
                 logger.error("MathHelper not found!");
             }
             if (srv.get(CRAFT_BUKKIT_MAIN) == null) {
@@ -166,13 +158,16 @@ public class KibblePatcher implements Opcodes {
             System.exit(3);
             return;
         }
-        String NMS = libraryMode ? null : MathHelper.substring(21, MathHelper.lastIndexOf('/'));
+        String NMS = libraryMode ? null : CraftServer.substring(21, CraftServer.lastIndexOf('/'));
         Random accessPkgRnd = new Random();
         String accessPkg = libraryMode ? "net/kibblelands/server/private/" :
                 "org/bukkit/craftbukkit/libs/" + "abcdef".charAt(accessPkgRnd.nextInt(6)) +
                         UUID.randomUUID().toString().replace("-", "").substring(0, accessPkgRnd.nextInt(32)) + "/";
         // CommonGenerator is only available if features patches are enabled
-        CommonGenerator commonGenerator = new CommonGenerator(NMS, this.featuresPatches, this.builtInMode);
+        boolean MojangMapped = srv.containsKey("net/minecraft/util/MathHelper.class");
+        CommonGenerator commonGenerator = new CommonGenerator(
+                MojangMapped ? new MojangMapper(NMS) : new NMSMapper(NMS), this.featuresPatches);
+        String MathHelper = commonGenerator.mapClass("net/minecraft/server/$NMS/MathHelper");
         ClassDataProvider classDataProvider = new ClassDataProvider(KibblePatcher.class.getClassLoader());
         classDataProvider.addClasses(srv);
         System.gc(); // Clean memory
@@ -180,20 +175,9 @@ public class KibblePatcher implements Opcodes {
         logger.info(ConsoleColors.GREEN_BOLD + "Paw" + ConsoleColors.GREEN + "tching jar..."); // Pawtching jar...
         int[] stats = {0, 0, 0, 0, 0, 0, 0};
         // Patch Manifest
-        manifest.getMainAttributes().putValue(this.builtInMode ? "Kibble-BuiltIn" : "Kibble-Version", KIBBLE_VERSION);
+        manifest.getMainAttributes().putValue("Kibble-Version", KIBBLE_VERSION);
         final boolean[] plRewrite = new boolean[]{false};
-        if (this.builtInMode) {
-            if (!libraryMode) {
-                if (bugFixesPatches) {
-                    NPECheckFixes.patch(commonGenerator, srv);
-                }
-                BlockDataOptimiser.patch(commonGenerator, srv, stats);
-                if (this.builtInModeRewrite) {
-                    PluginRewriteOptimiser.patch(commonGenerator, srv, inject, this.builtInPkg, plRewrite);
-                }
-                NMSAccessOptimizer.patch(commonGenerator, srv);
-            }
-        } else if (!libraryMode) {
+        if (!libraryMode) {
             if (manifest.getAttributes("net/minecraft/server/") == null) {
                 Attributes attributes = new Attributes();
                 attributes.putValue("Sealed", "true");
@@ -228,11 +212,9 @@ public class KibblePatcher implements Opcodes {
                 AuthentificationHardening.patch(commonGenerator, srv, stats);
             }
             // Specific optimisations
-            if (!isBuiltInPatched) {
-                ChunkCacheOptimizer.patch(commonGenerator, srv, stats);
-                MethodResultCacheOptimizer.patch(commonGenerator, srv, stats);
-                BlockDataOptimiser.patch(commonGenerator, srv, stats);
-            }
+            ChunkCacheOptimizer.patch(commonGenerator, srv, stats);
+            MethodResultCacheOptimizer.patch(commonGenerator, srv, stats);
+            BlockDataOptimiser.patch(commonGenerator, srv, stats);
             if (!isRewriteInstalled) {
                 PluginRewriteOptimiser.patch(commonGenerator, srv, inject, accessPkg, plRewrite);
             }
@@ -266,8 +248,7 @@ public class KibblePatcher implements Opcodes {
                         IOUtils.readResource("javax/xml/bind/annotation/adapters/HexBinaryAdapter.class"));
             }
         }
-        if (((!this.builtInMode) || this.builtInPkg.equals("net/kibblelands/server/util/"))
-                && !(isBuiltInPatched && srv.containsKey("net/kibblelands/server/util/FastMath.class"))) {
+
             byte[] FastMathAPI = IOUtils.readResource("net/kibblelands/server/util/FastMath.class");
             byte[] FastReplaceAPI = IOUtils.readResource("net/kibblelands/server/util/FastReplace.class");
             byte[] FastCollectionsAPI = IOUtils.readResource("net/kibblelands/server/util/FastCollections.class");
@@ -341,20 +322,18 @@ public class KibblePatcher implements Opcodes {
                 } else {
                     new ClassReader(FastCollectionsAPI).accept(fastCollectionsClassNode, 0);
                 }
-                if (!isBuiltInPatched) {
-                    // Hide actual access methods, help against detection
-                    // Some plugins no longer behave like intended
-                    Remapper hideRemapper = new PrefixRemapper("net/kibblelands/server/util/", accessPkg);
-                    classWriter = classDataProvider.newClassWriter();
-                    fastMathClassNode.accept(new ClassRelocator(classWriter, hideRemapper));
-                    inject.put(accessPkg + "FastMath.class", classWriter.toByteArray());
-                    classWriter = classDataProvider.newClassWriter();
-                    fastReplaceClassNode.accept(new ClassRelocator(classWriter, hideRemapper));
-                    inject.put(accessPkg + "FastReplace.class", classWriter.toByteArray());
-                    classWriter = classDataProvider.newClassWriter();
-                    fastCollectionsClassNode.accept(new ClassRelocator(classWriter, hideRemapper));
-                    inject.put(accessPkg + "FastCollections.class", classWriter.toByteArray());
-                }
+                // Hide actual access methods, help against detection
+                // Some plugins no longer behave like intended
+                Remapper hideRemapper = new PrefixRemapper("net/kibblelands/server/util/", accessPkg);
+                classWriter = classDataProvider.newClassWriter();
+                fastMathClassNode.accept(new ClassRelocator(classWriter, hideRemapper));
+                inject.put(accessPkg + "FastMath.class", classWriter.toByteArray());
+                classWriter = classDataProvider.newClassWriter();
+                fastReplaceClassNode.accept(new ClassRelocator(classWriter, hideRemapper));
+                inject.put(accessPkg + "FastReplace.class", classWriter.toByteArray());
+                classWriter = classDataProvider.newClassWriter();
+                fastCollectionsClassNode.accept(new ClassRelocator(classWriter, hideRemapper));
+                inject.put(accessPkg + "FastCollections.class", classWriter.toByteArray());
             }
             if (this.featuresPatches) {
                 inject.put("net/kibblelands/server/util/FastMath.class", FastMathAPI);
@@ -362,12 +341,12 @@ public class KibblePatcher implements Opcodes {
                 inject.put("net/kibblelands/server/util/FastCollections.class", FastCollectionsAPI);
                 commonGenerator.addChangeEntry("Added FastAPI. " + ConsoleColors.CYAN + "(Feature)");
             }
-        }
+
         commonGenerator.generate(inject, srv);
         // Optimise all classes
         srv.values().removeIf(Objects::isNull); // Clean null elements
         if (!libraryMode) {
-            if (!isBuiltInPatched) {
+
                 Iterator<Map.Entry<String, byte[]>> iterator = srv.entrySet().iterator();
                 while (iterator.hasNext()) {
                     Map.Entry<String, byte[]> entry = iterator.next();
@@ -387,21 +366,12 @@ public class KibblePatcher implements Opcodes {
                         iterator.remove();
                     }
                 }
-            }
-            if (!this.builtInMode) {
-                // Patch default config for performance
                 if (srv.get("configurations/bukkit.yml") != null) {
                     srv.put("configurations/bukkit.yml", new String(srv.get("configurations/bukkit.yml"), StandardCharsets.UTF_8)
-                            .replace("query-plugins: true", "query-plugins: false")
-                            .replace("period-in-ticks: 600", "period-in-ticks: 400")
-                            .replace("monster-spawns: 1", "monster-spawns: 5")
-                            .replace("water-spawns: 1", "water-spawns: 7")
-                            .replace("water-ambient-spawns: 1", "water-ambient-spawns: 20")
-                            .replace("ambient-spawns: 1", "ambient-spawns: 22").getBytes(StandardCharsets.UTF_8));
+                            .replace("query-plugins: true", "query-plugins: false").getBytes(StandardCharsets.UTF_8));
                 }
-            }
             // Get stats in final jar
-            manifest.getMainAttributes().putValue(this.builtInMode ? "Kibble-BuiltIn-Stats" : "Kibble-Stats", Arrays.toString(stats));
+            manifest.getMainAttributes().putValue("Kibble-Stats", Arrays.toString(stats));
         }
         orig = null;
         srv = null;
@@ -424,23 +394,17 @@ public class KibblePatcher implements Opcodes {
         fileOutputStream.flush();
         fileOutputStream.close();
         logger.info("Finished!\n");
-        if (!this.builtInMode) {
-            commonGenerator.printChanges(logger);
-            logger.info("Server patcher: ");
-            logger.info("  Plugin rewrite: "+(isBuiltInPatched?
-                    (ConsoleColors.CYAN + "BUILT-IN"):plRewrite[0]?
-                    (ConsoleColors.CYAN + "INSTALLED"):
-                    (ConsoleColors.YELLOW + "UNSUPPORTED")));
-        }
-        if (isBuiltInPatched) {
-            logger.info("Generic optimiser: " + ConsoleColors.YELLOW + "Skipped");
-        } else {
-            logger.info("Generic optimiser: ");
-            logger.info("  Optimised java calls: " + ConsoleColors.CYAN + stats[1]);
-            logger.info("  Optimised opcodes: " + ConsoleColors.CYAN + stats[2]); // Do we still count this?
-            if (externalPatches) {
-                logger.info("  Optimised forEach: " + ConsoleColors.CYAN + stats[6]);
-            }
+        commonGenerator.printChanges(logger);
+        logger.info("Server patcher: ");
+        logger.info("  Plugin rewrite: "+(isRewriteInstalled ?
+                (ConsoleColors.CYAN + "BUILT-IN"):plRewrite[0]?
+                (ConsoleColors.CYAN + "INSTALLED"):
+                (ConsoleColors.YELLOW + "UNSUPPORTED")));
+        logger.info("Generic optimiser: ");
+        logger.info("  Optimised java calls: " + ConsoleColors.CYAN + stats[1]);
+        logger.info("  Optimised opcodes: " + ConsoleColors.CYAN + stats[2]); // Do we still count this?
+        if (externalPatches) {
+            logger.info("  Optimised forEach: " + ConsoleColors.CYAN + stats[6]);
         }
         System.out.println();
         printSupportLinks(logger);
@@ -701,9 +665,7 @@ public class KibblePatcher implements Opcodes {
                         } else if (opcode == INVOKEVIRTUAL && owner.equals("java/lang/String") &&
                                 name.equals("replace") && descriptor.contains("CharSequence")) {
                             opcode = INVOKESTATIC;
-                            owner = KibblePatcher.this.builtInMode ?
-                                    (KibblePatcher.this.builtInPkg + "FastReplace") :
-                                    accessPkg + "FastReplace";
+                            owner = accessPkg + "FastReplace";
                             descriptor = replaceDesc;
                             stats[1]++;
                         }

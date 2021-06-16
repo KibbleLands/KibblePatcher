@@ -28,24 +28,24 @@ public class DimensionConfigAPIFeature implements Opcodes {
     public static void install(CommonGenerator commonGenerator, Map<String, byte[]> map,
                                Map<String, byte[]> inject, ClassDataProvider cdp) throws IOException {
         if (!ASMUtils.supportRemoteDataEdit(map)) return; // Skip on pre 1.16.2
-        String DIMENSION_MANAGER = NMS_DIMENSION_MANAGER.replace("$NMS", commonGenerator.getNMS());
-        String WORLD = NMS_WORLD.replace("$NMS", commonGenerator.getNMS());
-        String WORLD_SERVER = NMS_WORLD_SERVER.replace("$NMS", commonGenerator.getNMS());
-        String CRAFT_WORLD = NMS_CRAFT_WORLD.replace("$NMS", commonGenerator.getNMS());
+        String DIMENSION_MANAGER = commonGenerator.mapClass(NMS_DIMENSION_MANAGER);
+        String WORLD = commonGenerator.mapClass(NMS_WORLD);
+        String WORLD_SERVER = commonGenerator.mapClass(NMS_WORLD_SERVER);
+        String CRAFT_WORLD = commonGenerator.mapClass(NMS_CRAFT_WORLD);
         ClassNode nmsWorld;
         ClassNode craftWorld;
         ClassNode dimensionManager;
         { // Start - Implement getDimensionConfig
             byte[] bytes = map.get(WORLD + ".class");
             if (bytes == null) {
-                wtf("0x00", commonGenerator.getNMS());
+                wtf("0x00", commonGenerator.getMapperInfo());
                 return;
             }
             nmsWorld = new ClassNode();
             new ClassReader(bytes).accept(nmsWorld, 0);
             FieldNode dimensionManagerField = ASMUtils.findFieldByDesc(nmsWorld, "L" + DIMENSION_MANAGER + ";");
             if (dimensionManagerField == null) {
-                wtf("0x01", commonGenerator.getNMS());
+                wtf("0x01", commonGenerator.getMapperInfo());
                 return;
             }
             if ((dimensionManagerField.access & ACC_PUBLIC) == 0) {
@@ -54,14 +54,14 @@ public class DimensionConfigAPIFeature implements Opcodes {
             }
             bytes = map.get(CRAFT_WORLD + ".class");
             if (bytes == null) {
-                wtf("0x02", commonGenerator.getNMS());
+                wtf("0x02", commonGenerator.getMapperInfo());
                 return;
             }
             craftWorld = new ClassNode();
-            new ClassReader(bytes).accept(craftWorld, 0);
+            new ClassReader(bytes).accept(craftWorld, ClassReader.SKIP_FRAMES);
             FieldNode serverWorldField = ASMUtils.findFieldByDesc(craftWorld, "L" + WORLD_SERVER + ";");
             if (serverWorldField == null) {
-                wtf("0x03", commonGenerator.getNMS());
+                wtf("0x03", commonGenerator.getMapperInfo());
                 return;
             }
             MethodNode getDimensionConfig = new MethodNode(ACC_PUBLIC,
@@ -79,15 +79,15 @@ public class DimensionConfigAPIFeature implements Opcodes {
         { // Start - Create DimensionConfig Implementation
             byte[] bytes = map.get(DIMENSION_MANAGER + ".class");
             if (bytes == null) {
-                wtf("0x04", commonGenerator.getNMS());
+                wtf("0x04", commonGenerator.getMapperInfo());
                 return;
             }
             dimensionManager = new ClassNode();
-            new ClassReader(bytes).accept(dimensionManager, 0);
+            new ClassReader(bytes).accept(dimensionManager, ClassReader.SKIP_FRAMES);
             dimensionManager.interfaces.add(API_DIMENSION_CONFIG);
             FieldNode ambientLight = ASMUtils.findFieldByDesc(dimensionManager, "F");
             if (ambientLight == null) {
-                wtf("0x05", commonGenerator.getNMS());
+                wtf("0x05", commonGenerator.getMapperInfo());
                 return;
             }
             ASMUtils.createAccessorIfNecessary(dimensionManager, ambientLight, "AmbientLight");
@@ -97,20 +97,20 @@ public class DimensionConfigAPIFeature implements Opcodes {
             for (int i = 0; i < indexes.length; i++) {
                 FieldNode zField = ASMUtils.findFieldByDescIndex(dimensionManager, "Z", indexes[i]);
                 if (zField == null) {
-                    wtf("0x1" + i, commonGenerator.getNMS());
+                    wtf("0x1" + i, commonGenerator.getMapperInfo());
                     return;
                 }
                 ASMUtils.createAccessorIfNecessary(dimensionManager, zField, names[i]);
             }
         } // End - Create DimensionConfig Implementation
         { // Start - Inject class modifications
-            ClassWriter classWriter = new ClassWriter(0);
+            ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
             nmsWorld.accept(classWriter);
             map.put(WORLD+".class", classWriter.toByteArray());
-            classWriter = new ClassWriter(0);
+            classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
             craftWorld.accept(classWriter);
             map.put(CRAFT_WORLD+".class", classWriter.toByteArray());
-            classWriter = new ClassWriter(0);
+            classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
             dimensionManager.accept(classWriter);
             map.put(DIMENSION_MANAGER+".class", classWriter.toByteArray());
             installLib(map, inject);

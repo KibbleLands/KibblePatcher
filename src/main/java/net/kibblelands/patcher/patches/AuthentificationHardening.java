@@ -19,10 +19,10 @@ public class AuthentificationHardening implements Opcodes {
     private static final String INVALID_DATA_MESSAGE = "Unexpected custom data from client";
 
     public static void patch(CommonGenerator commonGenerator, Map<String, byte[]> map, final int[] stats) {
-        String loginListener = commonGenerator.nms(LOGIN_LISTENER);
-        String authPacket = commonGenerator.nms(PACKET_AUTH);
-        String baseComponent = commonGenerator.nms(BASE_COMPONENT);
-        String chatMessage = commonGenerator.nms(CHAT_MESSAGE);
+        String loginListener = commonGenerator.mapClass(LOGIN_LISTENER);
+        String authPacket = commonGenerator.mapClass(PACKET_AUTH);
+        String baseComponent = commonGenerator.mapClass(BASE_COMPONENT);
+        String chatMessage = commonGenerator.mapClass(CHAT_MESSAGE);
         String loginListenerCL = loginListener + ".class";
         if (!map.containsKey(authPacket + ".class")) {
             return;

@@ -55,14 +55,13 @@ public class BiomeConfigAPIFeature implements Opcodes {
     public static void install(CommonGenerator commonGenerator, Map<String, byte[]> map,
                                Map<String, byte[]> inject, ClassDataProvider cdp) throws IOException {
         if (!ASMUtils.supportRemoteDataEdit(map)) return; // Skip on pre 1.16.2
-        String NMS = commonGenerator.getNMS();
-        String BIOME_BASE = NMS_BIOME_BASE.replace("$NMS", NMS);
-        String BIOME_FOG = NMS_BIOME_FOG.replace("$NMS", NMS);
-        String CRAFT_BLOCK = NMS_CRAFT_BLOCK.replace("$NMS", NMS);
-        String CRAFT_WORLD = NMS_CRAFT_WORLD.replace("$NMS", NMS);
-        String GRASS_COLOR = NMS_GRASS_COLOR.replace("$NMS", NMS);
+        String BIOME_BASE = commonGenerator.mapClass(NMS_BIOME_BASE);
+        String BIOME_FOG = commonGenerator.mapClass(NMS_BIOME_FOG);
+        String CRAFT_BLOCK = commonGenerator.mapClass(NMS_CRAFT_BLOCK);
+        String CRAFT_WORLD = commonGenerator.mapClass(NMS_CRAFT_WORLD);
+        String GRASS_COLOR = commonGenerator.mapClass(NMS_GRASS_COLOR);
         ClassNode craftWorldNode = new ClassNode();
-        new ClassReader(map.get(CRAFT_WORLD+".class")).accept(craftWorldNode, 0);
+        new ClassReader(map.get(CRAFT_WORLD+".class")).accept(craftWorldNode, ClassReader.SKIP_FRAMES);
         MethodNode setBiome = ASMUtils.findMethod(craftWorldNode, "setBiome", "(IIIL"+BUKKIT_BIOME+";)V");
         if (setBiome == null) {
             System.out.println("WTF? Err 0x00");
@@ -97,9 +96,9 @@ public class BiomeConfigAPIFeature implements Opcodes {
         byte[] newCraftWorld = classWriter.toByteArray();
         // BiomeConfig base Impl
         ClassNode biomeBase = new ClassNode();
-        new ClassReader(map.get(BIOME_BASE+".class")).accept(biomeBase, 0);
+        new ClassReader(map.get(BIOME_BASE+".class")).accept(biomeBase, ClassReader.SKIP_FRAMES);
         ClassNode biomeFog = new ClassNode();
-        new ClassReader(map.get(BIOME_FOG+".class")).accept(biomeFog, 0);
+        new ClassReader(map.get(BIOME_FOG+".class")).accept(biomeFog, ClassReader.SKIP_FRAMES);
         if (biomeBase.interfaces == null) biomeBase.interfaces = new ArrayList<>();
         biomeBase.interfaces.add(API_BIOME_CONFIG);
         biomeBase.fields.add(new FieldNode(ACC_PUBLIC, "bukkitBiome", "L" + BUKKIT_BIOME + ";", null, null));
@@ -130,11 +129,11 @@ public class BiomeConfigAPIFeature implements Opcodes {
             }
         }
         // BiomeParticle Methods
-        String BIOME_PARTICLE = NMS_BIOME_PARTICLES.replace("$NMS", NMS);
-        String CRAFT_PARTICLE = NMS_CRAFT_PARTICLE.replace("$NMS", NMS);
-        String PARTICLES_PARAM = NMS_PARTICLES_PARAM.replace("$NMS", NMS);
+        String BIOME_PARTICLE = commonGenerator.mapClass(NMS_BIOME_PARTICLES);
+        String CRAFT_PARTICLE = commonGenerator.mapClass(NMS_CRAFT_PARTICLE);
+        String PARTICLES_PARAM = commonGenerator.mapClass(NMS_PARTICLES_PARAM);
         ClassNode biomeParticlesCL = new ClassNode();
-        new ClassReader(map.get(BIOME_PARTICLE+".class")).accept(biomeParticlesCL, 0);
+        new ClassReader(map.get(BIOME_PARTICLE+".class")).accept(biomeParticlesCL, ClassReader.SKIP_FRAMES);
         biomeParticlesCL.fields.add(new FieldNode(ACC_PUBLIC,
                 "kibbleBiomeParticles", "L" + API_BIOME_PARTICLES + ";", null, null));
         FieldNode biomeParticle = ASMUtils.findFieldBySignature(biomeFog,
@@ -205,12 +204,12 @@ public class BiomeConfigAPIFeature implements Opcodes {
             n2b.add(end);
         });
         // AmbientSound Methods
-        String CRAFT_SOUND = NMS_CRAFT_SOUND.replace("$NMS", NMS);
-        String SOUND_EFFECT = NMS_SOUND_EFFECT.replace("$NMS", NMS);
+        String CRAFT_SOUND = commonGenerator.mapClass(NMS_CRAFT_SOUND);
+        String SOUND_EFFECT = commonGenerator.mapClass(NMS_SOUND_EFFECT);
         FieldNode ambientSound = ASMUtils
                 .findFieldByTypeOrOptional(biomeFog, SOUND_EFFECT);
         if (ambientSound == null) {
-            wtf(NMS, "0x03");
+            wtf(commonGenerator.getMapperInfo(), "0x03");
             return;
         }
         addObjectMethods(biomeBase, biomeFogField, BIOME_FOG, ambientSound, BUKKIT_SOUND, "AmbientSound",
@@ -219,25 +218,25 @@ public class BiomeConfigAPIFeature implements Opcodes {
                 n2b -> n2b.add(new MethodInsnNode(INVOKESTATIC, CRAFT_SOUND, "getBukkit",
                         "(L" + SOUND_EFFECT + ";)L"+BUKKIT_SOUND+";")));
         // BiomeMusic Methods
-        String MUSIC = NMS_MUSIC.replace("$NMS", NMS);
+        String MUSIC = commonGenerator.mapClass(NMS_MUSIC);
         FieldNode biomeMusic = ASMUtils
                 .findFieldByTypeOrOptional(biomeFog, MUSIC);
         if (biomeMusic == null) {
-            wtf(NMS, "0x06");
+            wtf(commonGenerator.getMapperInfo(), "0x06");
             return;
         }
         ClassNode musicCL = new ClassNode();
-        new ClassReader(map.get(MUSIC+".class")).accept(musicCL, 0);
+        new ClassReader(map.get(MUSIC+".class")).accept(musicCL, ClassReader.SKIP_FRAMES);
         FieldNode musicSoundEffect = ASMUtils.findFieldByDesc(musicCL, "L" + SOUND_EFFECT + ";");
         if (musicSoundEffect == null) {
-            wtf(NMS, "0x07");
+            wtf(commonGenerator.getMapperInfo(), "0x07");
             return;
         }
         FieldNode minDeleay = ASMUtils.findFieldByDescIndex(musicCL, "I", 0);
         FieldNode maxDeleay = ASMUtils.findFieldByDescIndex(musicCL, "I", 1);
         FieldNode replace = ASMUtils.findFieldByDesc(musicCL, "Z");
         if (minDeleay == null || maxDeleay == null || replace == null) {
-            wtf(NMS, "0x08");
+            wtf(commonGenerator.getMapperInfo(), "0x08");
             return;
         }
         addObjectMethods(biomeBase, biomeFogField, BIOME_FOG, biomeMusic, API_BIOME_MUSIC, "BiomeMusic", b2n -> {
@@ -289,7 +288,7 @@ public class BiomeConfigAPIFeature implements Opcodes {
         FieldNode grassColorAccessor = ASMUtils
                 .findFieldByTypeOrOptional(biomeFog, GRASS_COLOR);
         if (grassColorAccessor == null) {
-            wtf(NMS, "0x09");
+            wtf(commonGenerator.getMapperInfo(), "0x09");
             return;
         }
         addEnumMethods(biomeBase, biomeFogField, BIOME_FOG,
@@ -472,7 +471,7 @@ public class BiomeConfigAPIFeature implements Opcodes {
         }
         byte[] bytes = map.get(BUKKIT_BIOME+".class");
         ClassNode classNode = new ClassNode();
-        new ClassReader(bytes).accept(classNode, 0);
+        new ClassReader(bytes).accept(classNode, ClassReader.SKIP_FRAMES);
         MethodNode methodNode = new MethodNode(ACC_PUBLIC, "getConfig", "()L" + API_BIOME_CONFIG + ";", null, null);
         methodNode.instructions.add(new MethodInsnNode(INVOKESTATIC,
                 "org/bukkit/Bukkit", "getWorlds", "()Ljava/util/List;", false));
@@ -492,7 +491,7 @@ public class BiomeConfigAPIFeature implements Opcodes {
         // World
         bytes = map.get(BUKKIT_WORLD+".class");
         classNode = new ClassNode();
-        new ClassReader(bytes).accept(classNode, 0);
+        new ClassReader(bytes).accept(classNode, ClassReader.SKIP_FRAMES);
         methodNode = new MethodNode(ACC_PUBLIC | ACC_ABSTRACT, "getBiomeConfig",
                 "(L" + BUKKIT_BIOME + ";)L" + API_BIOME_CONFIG + ";", null, null);
         classNode.methods.add(methodNode);

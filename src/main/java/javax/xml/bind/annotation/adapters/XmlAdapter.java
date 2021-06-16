@@ -5,7 +5,7 @@ package javax.xml.bind.annotation.adapters;
  * {@code javax.xml.bind.annotation.adapters.XmlAdapter} is missing
  */
 @Deprecated
-@SuppressWarnings("DeprecatedIsStillUsed")
+@SuppressWarnings({"DeprecatedIsStillUsed"})
 public abstract class XmlAdapter<To,From> {
     @Deprecated
     protected XmlAdapter() {}

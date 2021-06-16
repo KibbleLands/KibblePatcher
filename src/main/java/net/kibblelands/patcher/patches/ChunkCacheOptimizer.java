@@ -18,37 +18,35 @@ public class ChunkCacheOptimizer implements Opcodes {
     private static final String CHUNK_PROVIDER = "net/minecraft/server/$NMS/ChunkProviderServer.class";
 
     public static void patch(CommonGenerator commonGenerator,Map<String, byte[]> map, final int[] stats) {
-        String NMS = commonGenerator.getNMS();
-        String CHUNK_PROVIDER_RESOLVED = CHUNK_PROVIDER.replace("$NMS", NMS);
+        String CHUNK_PROVIDER_RESOLVED = commonGenerator.mapClass(CHUNK_PROVIDER);
         if (map.get(CHUNK_PROVIDER_RESOLVED) == null) {
             return;
         }
         ClassNode classNode = new ClassNode();
         new ClassReader(map.get(CHUNK_PROVIDER_RESOLVED)).accept(classNode, 0);
-        if (!ASMUtils.hasField(classNode, "cachePos")) {
+        String cachePos = commonGenerator.mapFieldName(CHUNK_PROVIDER_RESOLVED, "cachePos");
+        if (!ASMUtils.hasField(classNode, cachePos)) {
             return; // Incompatible version (Like 1.8)
         }
-        MethodNode methodNode = ASMUtils.findMethodByDesc(classNode,
-                "(JLnet/minecraft/server/$NMS/IChunkAccess;Lnet/minecraft/server/$NMS/ChunkStatus;)V"
-                        .replace("$NMS", NMS));
-        MethodNode methodNode2 = ASMUtils.findMethodByDesc(classNode,
-                "(IILnet/minecraft/server/$NMS/ChunkStatus;Z)Lnet/minecraft/server/$NMS/IChunkAccess;"
-                        .replace("$NMS", NMS));
-        MethodNode methodNode3 = ASMUtils.findMethodByDesc(classNode,
-                "(II)Lnet/minecraft/server/$NMS/Chunk;"
-                        .replace("$NMS", NMS));
+        MethodNode methodNode = ASMUtils.findMethodByDesc(classNode, commonGenerator.mapDesc(
+                "(JLnet/minecraft/server/$NMS/IChunkAccess;Lnet/minecraft/server/$NMS/ChunkStatus;)V"));
+        MethodNode methodNode2 = ASMUtils.findMethodByDesc(classNode, commonGenerator.mapDesc(
+                "(IILnet/minecraft/server/$NMS/ChunkStatus;Z)Lnet/minecraft/server/$NMS/IChunkAccess;"));
+        MethodNode methodNode3 = ASMUtils.findMethodByDesc(classNode, commonGenerator.mapDesc(
+                "(II)Lnet/minecraft/server/$NMS/Chunk;"));
         MethodNode methodNode4 = ASMUtils.findBaseConstructor(classNode);
         if (methodNode == null || methodNode2 == null || methodNode3 == null || methodNode4 == null) {
             System.out.println("An optimisation has failed in an unexpected way. please report the issue with your server jar!");
-            System.out.println("NMS: "+NMS);
+            System.out.println("NMS: "+commonGenerator.getMapperInfo());
             System.out.println("Debug state: "+ Arrays.toString(
                     new boolean[]{methodNode == null, methodNode2 == null, methodNode3 == null, methodNode4 == null}));
             return; // Incompatible version!?
         }
+        // TODO Change code to a more future proof and generic way
         InsnNode int3 = new InsnNode(ICONST_3);
         InsnNode int4 = new InsnNode(ICONST_4);
-        IntInsnNode int31 = new IntInsnNode(BIPUSH, 31);
-        IntInsnNode int32 = new IntInsnNode(BIPUSH, 32);
+        IntInsnNode int31 = new IntInsnNode(BIPUSH, 15);
+        IntInsnNode int32 = new IntInsnNode(BIPUSH, 16);
         int opts = 0;
         opts += ASMUtils.replaceInstruction(methodNode, int3, int31);
         opts += ASMUtils.replaceInstruction(methodNode2, int4, int32);

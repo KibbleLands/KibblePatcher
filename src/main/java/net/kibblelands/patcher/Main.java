@@ -20,18 +20,9 @@ public final class Main {
     private static final Logger LOGGER = new Logger("KibblePatcher");
 
     public static void main(String[] args) throws IOException {
-        boolean builtInMode = false;
-        boolean builtInModeRewrite = false;
         boolean fullPatch = false;
         boolean generate = false;
-        String builtInPkg = null;
         String xlistFilter = "";
-        if (args.length == 4 && ("-builtin-has-rewrite".equals(args[0]) ||
-                (builtInModeRewrite = "-builtin".equals(args[0])))) {
-            args = new String[]{args[2], args[3]};
-            builtInMode = true;
-            builtInPkg = args[1];
-        }
         if (args.length == 3) {
             if (("-full".equals(args[0]))) {
                 args = new String[]{args[1], args[2]};
@@ -51,8 +42,10 @@ public final class Main {
         if (args.length != 2) {
             LOGGER.stdout("Usage: \n" +
                     "    java -jar KibblePatcher.jar <input> <output>\n" +
-                    "    java -jar KibblePatcher.jar -generate <input> <output>\n" +
+                    "    java -jar KibblePatcher.jar -full <input> <output>\n" +
                     "    java -jar KibblePatcher.jar -patch <file>\n" +
+                    "    java -jar KibblePatcher.jar -patch-full <file>\n" +
+                    "    java -jar KibblePatcher.jar -generate <input> <output>\n" +
                     "    java -jar KibblePatcher.jar -info <file>\n"+
                     "    java -jar KibblePatcher.jar -links\n");
             System.exit(1);
@@ -185,14 +178,6 @@ public final class Main {
         KibblePatcher kibblePatcher = new KibblePatcher(LOGGER);
         if (fullPatch) {
             kibblePatcher.featuresPatches = true;
-        }
-        if (builtInMode) {
-            LOGGER.warn("BuiltIn mode is deprecated, and no longer supported.");
-            kibblePatcher.compatibilityPatches = false;
-            kibblePatcher.featuresPatches = false;
-            kibblePatcher.builtInMode = true;
-            kibblePatcher.builtInPkg = builtInPkg;
-            kibblePatcher.builtInModeRewrite = builtInModeRewrite;
         }
         try {
             kibblePatcher.patchServerJar(in, new File(args[1]));

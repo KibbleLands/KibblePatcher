@@ -29,9 +29,9 @@ public class NPECheckFixes implements Opcodes {
     }
 
     public static void patch(CommonGenerator commonGenerator, Map<String, byte[]> map) {
-        String BEHAVIOUR_INTERACT_NMS = commonGenerator.nms(BEHAVIOUR_INTERACT);
-        String BEHAVIOUR_INTERACT_DOOR_NMS = commonGenerator.nms(BEHAVIOUR_INTERACT_DOOR);
-        String BEHAVIOUR_CONTROLLER_NMS = commonGenerator.nms(BEHAVIOUR_CONTROLLER);
+        String BEHAVIOUR_INTERACT_NMS = commonGenerator.mapClass(BEHAVIOUR_INTERACT);
+        String BEHAVIOUR_INTERACT_DOOR_NMS = commonGenerator.mapClass(BEHAVIOUR_INTERACT_DOOR);
+        String BEHAVIOUR_CONTROLLER_NMS = commonGenerator.mapClass(BEHAVIOUR_CONTROLLER);
         // This should fix logs spam of some servers.
         if (patchBehaviour(map, BEHAVIOUR_INTERACT_NMS, BEHAVIOUR_CONTROLLER_NMS) |
                 patchBehaviour(map, BEHAVIOUR_INTERACT_DOOR_NMS, BEHAVIOUR_CONTROLLER_NMS)) {

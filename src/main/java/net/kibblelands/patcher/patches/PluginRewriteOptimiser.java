@@ -29,8 +29,7 @@ public class PluginRewriteOptimiser implements Opcodes {
                 , new PrefixRemapper("net/kibblelands/patcher/runtime/", accessPkg)),
                 new PrefixRemapper("net/kibblelands/server/util/", accessPkg)), 0);
         bytes = classWriter.toByteArray(); }
-        String NMS = commonGenerator.getNMS();
-        String COMMODORE_MV = PluginRewriteOptimiser.COMMODORE_MV.replace("$NMS", NMS);
+        String COMMODORE_MV = commonGenerator.mapClass(PluginRewriteOptimiser.COMMODORE_MV);
         byte[] methodVisitor = map.get(COMMODORE_MV);
         if (methodVisitor == null) {
             return; // Unsupported

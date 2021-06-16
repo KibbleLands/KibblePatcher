@@ -30,7 +30,6 @@ public class EntityPropertiesFeature implements Opcodes {
 
     public static void install(CommonGenerator commonGenerator,Map<String, byte[]> map, Map<String, byte[]> inject,
                                final int[] stats) throws IOException {
-        String NMS = commonGenerator.getNMS();
         ClassNode classNode = new ClassNode();
         new ClassReader(map.get(ENTITY)).accept(classNode,0);
         classNode.methods.add(new MethodNode(ACC_PUBLIC|ACC_ABSTRACT|ACC_SYNTHETIC,
@@ -39,7 +38,7 @@ public class EntityPropertiesFeature implements Opcodes {
         classNode.accept(classWriter);
         map.put(ENTITY, classWriter.toByteArray());
         // Assume craft entity exists
-        String resolvedCraftEntity = CRAFT_ENTITY.replace("$NMS", NMS);
+        String resolvedCraftEntity = commonGenerator.mapClass(CRAFT_ENTITY);
         String asmCraftEntity = resolvedCraftEntity
                 .substring(0, resolvedCraftEntity.length() - 6);
         classNode = new ClassNode();

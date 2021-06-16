@@ -16,25 +16,24 @@ public class MethodResultCacheOptimizer implements Opcodes {
     private static final String LOCATION = "org/bukkit/Location.class";
 
     public static void patch(CommonGenerator commonGenerator,Map<String, byte[]> map, final int[] stats) {
-        String NMS = commonGenerator.getNMS();
-        byte[] bytes = map.get(FURNACE_TILE.replace("$NMS", NMS));
+        byte[] bytes = map.get(commonGenerator.mapClass(FURNACE_TILE));
         if (bytes != null) {
             ClassNode classNode = new ClassNode();
             new ClassReader(bytes).accept(classNode, 0);
             MethodNode methodNode = ASMUtils.findMethodBySignature(classNode,
-                    "()Ljava/util/Map<Lnet/minecraft/server/$NMS/Item;Ljava/lang/Integer;>;".replace("$NMS", NMS));
+                    commonGenerator.mapDesc("()Ljava/util/Map<Lnet/minecraft/server/$NMS/Item;Ljava/lang/Integer;>;"));
             if (methodNode != null) {
                 cacheMethodResult(classNode, methodNode);
                 stats[4]++;
             }
             ClassWriter classWriter = new ClassWriter(0);
             classNode.accept(classWriter);
-            map.put(FURNACE_TILE.replace("$NMS", NMS), classWriter.toByteArray());
+            map.put(commonGenerator.mapClass(FURNACE_TILE), classWriter.toByteArray());
             commonGenerator.addChangeEntry("Cache furnace fuel list " + ConsoleColors.CYAN + "(Optimisation)");
         }
-        bytes = map.get(BLOCK_POSITION.replace("$NMS", NMS));
+        bytes = map.get(commonGenerator.mapClass(BLOCK_POSITION));
         if (bytes != null) {
-            boolean mutableException = map.containsKey(MUTABLE_BLOCK_POSITION.replace("$NMS", NMS));
+            boolean mutableException = map.containsKey(commonGenerator.mapClass(MUTABLE_BLOCK_POSITION));
             ClassNode classNode = new ClassNode();
             new ClassReader(bytes).accept(classNode, 0);
             if (cacheHashCode(classNode, !mutableException, false)) {
@@ -54,28 +53,28 @@ public class MethodResultCacheOptimizer implements Opcodes {
                 }
                 ClassWriter classWriter = new ClassWriter(0);
                 classNode.accept(classWriter);
-                map.put(BLOCK_POSITION.replace("$NMS", NMS), classWriter.toByteArray());
+                map.put(commonGenerator.mapClass(BLOCK_POSITION), classWriter.toByteArray());
                 if (mutableException) {
-                    bytes = map.get(MUTABLE_BLOCK_POSITION.replace("$NMS", NMS));
+                    bytes = map.get(commonGenerator.mapClass(MUTABLE_BLOCK_POSITION));
                     classNode = new ClassNode();
                     new ClassReader(bytes).accept(classNode, 0);
                     if (cacheHashCode(classNode, false, true, baseBlockPos)) {
                         classWriter = new ClassWriter(0);
                         classNode.accept(classWriter);
-                        map.put(MUTABLE_BLOCK_POSITION.replace("$NMS", NMS), classWriter.toByteArray());
+                        map.put(commonGenerator.mapClass(MUTABLE_BLOCK_POSITION), classWriter.toByteArray());
                     }
                 }
                 commonGenerator.addChangeEntry("Cache BlockPosition hash " + ConsoleColors.CYAN + "(Optimisation)");
             }
         }
-        bytes = map.get(CRAFT_BLOCK.replace("$NMS", NMS));
+        bytes = map.get(commonGenerator.mapClass(CRAFT_BLOCK));
         if (bytes != null) {
             ClassNode classNode = new ClassNode();
             new ClassReader(bytes).accept(classNode, 0);
             if (cacheHashCode(classNode, true, false)) {
                 ClassWriter classWriter = new ClassWriter(0);
                 classNode.accept(classWriter);
-                map.put(CRAFT_BLOCK.replace("$NMS", NMS), classWriter.toByteArray());
+                map.put(commonGenerator.mapClass(CRAFT_BLOCK), classWriter.toByteArray());
                 commonGenerator.addChangeEntry("Cache CraftBlock hash " + ConsoleColors.CYAN + "(Optimisation)");
             }
         }

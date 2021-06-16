@@ -20,15 +20,14 @@ public class BookCrashFixer implements Opcodes {
     private static final String WRITABLE_BOOK = "WRITABLE_BOOK";
 
     public static void patch(CommonGenerator commonGenerator,Map<String, byte[]> map, final int[] stats) {
-        final String NMS = commonGenerator.getNMS();
-        if (map.containsKey(NMS_PACKED_BOOK_EDIT.replace("$NMS", NMS))) {
+        if (map.containsKey(commonGenerator.mapClass(NMS_PACKED_BOOK_EDIT))) {
             return; // The bug has already been patched
         }
-        final String PLAYER_CONNECTION = NMS_PLAYER_CONNECTION.replace("$NMS", NMS);
-        final String CUSTOM_PAYLOAD_PACKET = NMS_CUSTOM_PAYLOAD.replace("$NMS", NMS);
-        final String ITEMS = NMS_ITEMS.replace("$NMS", NMS);
-        final String ITEM = NMS_ITEM.replace("$NMS", NMS);
-        final String ITEM_STACK = NMS_ITEM_STACK.replace("$NMS", NMS);
+        final String PLAYER_CONNECTION = commonGenerator.mapClass(NMS_PLAYER_CONNECTION);
+        final String CUSTOM_PAYLOAD_PACKET = commonGenerator.mapClass(NMS_CUSTOM_PAYLOAD);
+        final String ITEMS = commonGenerator.mapClass(NMS_ITEMS);
+        final String ITEM = commonGenerator.mapClass(NMS_ITEM);
+        final String ITEM_STACK = commonGenerator.mapClass(NMS_ITEM_STACK);
         ClassNode classNode = new ClassNode();
         new ClassReader(map.get(PLAYER_CONNECTION+".class")).accept(classNode, 0);
         final String METHOD_DESC = "(L"+CUSTOM_PAYLOAD_PACKET+";)V";
@@ -40,7 +39,7 @@ public class BookCrashFixer implements Opcodes {
             }
         }
         if (packetHandler == null) {
-            wtf(NMS, "NoCustomPayloadHandler");
+            wtf(commonGenerator.getMapperInfo(), "NoCustomPayloadHandler");
             return;
         }
         InsnList getItem = new InsnList();
@@ -55,7 +54,7 @@ public class BookCrashFixer implements Opcodes {
                 getItem.insert(insnNode.clone(null));
                 insnNode = insnNode.getPrevious();
                 if (insnNode == null) {
-                    wtf(NMS, "NullPreviousInstruction");
+                    wtf(commonGenerator.getMapperInfo(), "NullPreviousInstruction");
                     return;
                 }
             }
@@ -63,7 +62,7 @@ public class BookCrashFixer implements Opcodes {
             break;
         }
         if (getItem.size() == 0) {
-            wtf(NMS, "GetPlayerItemNotFound");
+            wtf(commonGenerator.getMapperInfo(), "GetPlayerItemNotFound");
             return;
         }
         getItem.add(new InsnNode(DUP));
@@ -81,7 +80,7 @@ public class BookCrashFixer implements Opcodes {
         for (String channel : new String[]{"MC|BEdit", "MC|BSign"}) {
             AbstractInsnNode insnNode = ASMUtils.findLdc(packetHandler.instructions, channel);
             if (insnNode == null) {
-                wtf(NMS, "UnhandledChannel: "+channel);
+                wtf(commonGenerator.getMapperInfo(), "UnhandledChannel: "+channel);
                 return;
             }
             while (insnNode.getOpcode() != IFEQ) {
