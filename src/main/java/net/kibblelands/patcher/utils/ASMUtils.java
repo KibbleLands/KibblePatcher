@@ -23,6 +23,15 @@ public class ASMUtils implements Opcodes {
         return false;
     }
 
+    public static boolean hasFieldByDesc(ClassNode classNode,String fieldName) {
+        for (FieldNode fieldNode:classNode.fields) {
+            if (fieldNode.desc.equals(fieldName)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static boolean hasMethod(ClassNode classNode,String methodName) {
         return findMethod(classNode, methodName) != null;
     }

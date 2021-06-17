@@ -38,7 +38,7 @@ public class KibblePatcher implements Opcodes {
     private static final String BUKKIT_API = "org/bukkit/Bukkit.class";
     private static final String BUKKIT_VERSION_COMMAND = "org/bukkit/command/defaults/VersionCommand.class";
     private static final CancellationException SKIP = new CancellationException();
-    public static final String KIBBLE_VERSION = "1.7-dev01";
+    public static final String KIBBLE_VERSION = "1.7-dev02";
     // Enable dev warnings if the version contains "-dev"
     @SuppressWarnings("ALL")
     public static final boolean DEV_BUILD = KIBBLE_VERSION.contains("-dev") ||
@@ -71,7 +71,7 @@ public class KibblePatcher implements Opcodes {
 
     public void patchServerJar(File in, File out) throws IOException {
         if (DEV_BUILD) {
-            logger.warn("This version is an unofficial dev build of KibblePatcher!");
+            logger.warn("This version is an unstable dev build of KibblePatcher!");
         }
         ServerClipSupport serverClipSupport = ServerClipSupport.getServerClipSupport(in);
         if (serverClipSupport != null) {
@@ -130,7 +130,7 @@ public class KibblePatcher implements Opcodes {
         }
         String CraftServer = null;
         for (String entry:srv.keySet()) {
-            if (entry.startsWith("net/minecraft/server/") && entry.endsWith("/MathHelper.class")) {
+            if (entry.startsWith("org/bukkit/craftbukkit/") && entry.endsWith("/CraftServer.class")) {
                 CraftServer = entry.substring(0, entry.length() - 6);
                 break;
             }
@@ -150,7 +150,7 @@ public class KibblePatcher implements Opcodes {
         } else if (CraftServer == null || srv.get(CRAFT_BUKKIT_MAIN) == null) {
             logger.error("Server is not a valid spigot server!");
             if (CraftServer == null) {
-                logger.error("MathHelper not found!");
+                logger.error("CraftServer not found!");
             }
             if (srv.get(CRAFT_BUKKIT_MAIN) == null) {
                 logger.error("CraftBukkit Main class not found!");
@@ -158,7 +158,7 @@ public class KibblePatcher implements Opcodes {
             System.exit(3);
             return;
         }
-        String NMS = libraryMode ? null : CraftServer.substring(21, CraftServer.lastIndexOf('/'));
+        String NMS = libraryMode ? null : CraftServer.substring(23, CraftServer.lastIndexOf('/'));
         Random accessPkgRnd = new Random();
         String accessPkg = libraryMode ? "net/kibblelands/server/private/" :
                 "org/bukkit/craftbukkit/libs/" + "abcdef".charAt(accessPkgRnd.nextInt(6)) +
@@ -355,7 +355,7 @@ public class KibblePatcher implements Opcodes {
                             patchClassOpt(entry, classDataProvider, fast_util_prefix == null ||
                                             entry.getKey().startsWith(fast_util_prefix) ? null : fast_util_prefix,
                                     entry.getKey().startsWith("org/apache/commons/math3/") ||
-                                            entry.getKey().startsWith("net/minecraft/server/")
+                                            entry.getKey().startsWith(MathHelper)
                                             ? null : MathHelper, stats, accessPkg);
                         } else if (entry.getKey().equals("pack.mcmeta") || entry.getKey().endsWith(".json")) {
                             entry.setValue(IOUtils.trimJSON(new String(entry.getValue(),

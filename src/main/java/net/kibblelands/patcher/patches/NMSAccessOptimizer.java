@@ -35,7 +35,8 @@ public class NMSAccessOptimizer implements Opcodes {
 
                     @Override
                     public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
-                        return super.visitMethod((access& ACC_PROTECTED) != 0 ? access : (access&MASK)|ACC_PUBLIC, name, descriptor, signature, exceptions);
+                        return super.visitMethod((access& (ACC_PROTECTED|ACC_PRIVATE)) != 0 ? access :
+                                (access&MASK)|ACC_PUBLIC, name, descriptor, signature, exceptions);
                     }
 
                     @Override

@@ -9,7 +9,34 @@ public class MojangMapper extends NMSMapper {
 
     public MojangMapper(String nms) {
         super(nms);
+        this.clMap.put("net/minecraft/server/$NMS/BehaviorInteract",
+                "net/minecraft/world/entity/ai/behavior/BehaviorInteract");
+        this.clMap.put("net/minecraft/server/$NMS/BehaviorInteractDoor",
+                "net/minecraft/world/entity/ai/behavior/BehaviorInteractDoor");
+        this.clMap.put("net/minecraft/server/$NMS/BehaviorController",
+                "net/minecraft/world/entity/ai/BehaviorController");
+        this.clMap.put("net/minecraft/server/$NMS/Block", "net/minecraft/world/level/block/Block");
+        this.clMap.put("net/minecraft/server/$NMS/IBlockData", "net/minecraft/world/level/block/state/IBlockData");
+        this.clMap.put("net/minecraft/server/$NMS/BaseBlockPosition", "net/minecraft/core/BaseBlockPosition");
+        this.clMap.put("net/minecraft/server/$NMS/BlockPosition", "net/minecraft/core/BlockPosition");
+        this.clMap.put("net/minecraft/server/$NMS/BlockPosition$MutableBlockPosition",
+                "net/minecraft/core/BlockPosition$MutableBlockPosition");
+        this.clMap.put("net/minecraft/server/$NMS/IChatBaseComponent",
+                "net/minecraft/network/chat/IChatBaseComponent");
+        this.clMap.put("net/minecraft/server/$NMS/ChatMessage", "net/minecraft/network/chat/ChatMessage");
+        this.clMap.put("net/minecraft/server/$NMS/Chunk", "net/minecraft/world/level/chunk/Chunk");
+        this.clMap.put("net/minecraft/server/$NMS/IChunkAccess", "net/minecraft/world/level/chunk/IChunkAccess");
+        this.clMap.put("net/minecraft/server/$NMS/ChunkProviderServer",
+                "net/minecraft/server/level/ChunkProviderServer");
+        this.clMap.put("net/minecraft/server/$NMS/ChunkStatus", "net/minecraft/world/level/chunk/ChunkStatus");
+        this.clMap.put("net/minecraft/server/$NMS/LoginListener", "net/minecraft/server/network/LoginListener");
         this.clMap.put("net/minecraft/server/$NMS/MathHelper", "net/minecraft/util/MathHelper");
+        this.clMap.put("net/minecraft/server/$NMS/PacketLoginInEncryptionBegin",
+                "net/minecraft/network/protocol/login/PacketLoginInEncryptionBegin");
+        this.clMap.put("net/minecraft/server/$NMS/PacketPlayInBEdit",
+                "net/minecraft/network/protocol/game/PacketPlayInBEdit");
+        this.clMap.put("net/minecraft/server/$NMS/TileEntityFurnace",
+                "net/minecraft/world/level/block/entity/TileEntityFurnace");
     }
 
     @Override
