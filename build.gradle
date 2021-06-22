@@ -58,6 +58,12 @@ tasks.withType(JavaCompile) {
     options.encoding = "UTF-8"
 }
 
+//make builds reproducible
+tasks.withType(AbstractArchiveTask) {
+    reproducibleFileOrder = true
+    preserveFileTimestamps = false
+}
+
 task buildRoot(type: Task) {
     doLast {
         Files.copy(new File(project.buildDir, "libs/KibblePatcher-${version}.jar").toPath(),

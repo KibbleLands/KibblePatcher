@@ -52,7 +52,7 @@ having to wait their new version to finish downloading.
 If you get a "`Server is not a valid spigot server!`" make sure it's not a hybrid server 
 *(Bukkit + Forge)*
 
-1. Get you server.jar and KibblePatcher.jar *(You can use [Yatopia](https://yatopiamc.org/download.html) as your server jar)*
+1. Get you server.jar and KibblePatcher.jar *(You can use [Airplane](https://dl.airplane.gg/) as your server jar)*
 2. Run the command `java -jar KibblePatcher.jar server.jar server-patched.jar`
 3. Use the `server-patched.jar` as a normal server jar
 4. Enjoy! :3
