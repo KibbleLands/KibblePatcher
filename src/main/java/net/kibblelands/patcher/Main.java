@@ -127,10 +127,15 @@ public final class Main {
                 String version = mainAttributes.getValue("Kibble-Version");
                 String versionBuiltIn = mainAttributes.getValue("Kibble-BuiltIn");
                 String pluginRewrite = mainAttributes.getValue("Kibble-Rewrite");
+                String patcherVersion = mainAttributes.getValue("KibblePatcher-Version");
                 if (pluginRewrite == null && versionBuiltIn != null) {
                     pluginRewrite = "BUILT-IN";
                 }
                 if (version == null && versionBuiltIn == null) {
+                    if (patcherVersion != null) {
+                        LOGGER.info("This is KibblePatcher v" + patcherVersion);
+                        return;
+                    }
                     if (pluginRewrite != null && !pluginRewrite.equals("UNSUPPORTED") ) {
                         LOGGER.info("Plugin rewrite: " + ConsoleColors.CYAN + pluginRewrite);
                     }

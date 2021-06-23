@@ -32,7 +32,8 @@ public class MethodResultCacheOptimizer implements Opcodes {
             commonGenerator.addChangeEntry("Cache furnace fuel list " + ConsoleColors.CYAN + "(Optimisation)");
         }
         bytes = map.get(commonGenerator.mapClass(BLOCK_POSITION));
-        if (bytes != null) {
+        // TODO Rework the patch
+        if (bytes != null && false) { // Disabled temporary
             boolean mutableException = map.containsKey(commonGenerator.mapClass(MUTABLE_BLOCK_POSITION));
             ClassNode classNode = new ClassNode();
             new ClassReader(bytes).accept(classNode, 0);

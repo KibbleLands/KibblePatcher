@@ -38,7 +38,7 @@ public class KibblePatcher implements Opcodes {
     private static final String BUKKIT_API = "org/bukkit/Bukkit.class";
     private static final String BUKKIT_VERSION_COMMAND = "org/bukkit/command/defaults/VersionCommand.class";
     private static final CancellationException SKIP = new CancellationException();
-    public static final String KIBBLE_VERSION = "1.7-dev02";
+    public static final String KIBBLE_VERSION = "1.7-dev03";
     // Enable dev warnings if the version contains "-dev"
     @SuppressWarnings("ALL")
     public static final boolean DEV_BUILD = KIBBLE_VERSION.contains("-dev") ||
@@ -354,8 +354,9 @@ public class KibblePatcher implements Opcodes {
                         if (entry.getKey().endsWith(".class")) {
                             patchClassOpt(entry, classDataProvider, fast_util_prefix == null ||
                                             entry.getKey().startsWith(fast_util_prefix) ? null : fast_util_prefix,
-                                    entry.getKey().startsWith("org/apache/commons/math3/") ||
-                                            entry.getKey().startsWith(MathHelper)
+                                    (entry.getKey().startsWith("org/apache/commons/math3/") ||
+                                            entry.getKey().startsWith(MathHelper) ||
+                                                    entry.getKey().endsWith("/CompactSineLUT.class"))
                                             ? null : MathHelper, stats, accessPkg);
                         } else if (entry.getKey().equals("pack.mcmeta") || entry.getKey().endsWith(".json")) {
                             entry.setValue(IOUtils.trimJSON(new String(entry.getValue(),
