@@ -17,7 +17,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.*;
 import java.util.concurrent.CancellationException;
-import java.util.jar.Attributes;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
 import java.util.zip.ZipEntry;
@@ -38,7 +37,7 @@ public class KibblePatcher implements Opcodes {
     private static final String BUKKIT_API = "org/bukkit/Bukkit.class";
     private static final String BUKKIT_VERSION_COMMAND = "org/bukkit/command/defaults/VersionCommand.class";
     private static final CancellationException SKIP = new CancellationException();
-    public static final String KIBBLE_VERSION = "1.7-dev03";
+    public static final String KIBBLE_VERSION = "1.7-dev04";
     // Enable dev warnings if the version contains "-dev"
     @SuppressWarnings("ALL")
     public static final boolean DEV_BUILD = KIBBLE_VERSION.contains("-dev") ||
@@ -76,6 +75,11 @@ public class KibblePatcher implements Opcodes {
         ServerClipSupport serverClipSupport = ServerClipSupport.getServerClipSupport(in);
         if (serverClipSupport != null) {
             logger.info("Generating " + serverClipSupport.getName().toLowerCase() + " server...");
+            if (serverClipSupport.needNewerJVM()) {
+                logger.error("This " + serverClipSupport.getName() + " require at least java " +
+                        ASMUtils.javaVersionFromClassFileVersion(serverClipSupport.getMinASM()) + " to run!");
+                return;
+            }
             this.patchServerJar0(serverClipSupport.patchServerClip(in), out);
             ServerClipSupport.cleanServerClip();
         } else {
@@ -118,16 +122,6 @@ public class KibblePatcher implements Opcodes {
                 manifest.getMainAttributes().containsKey("Kibble-Rewrite") && (
                         "BUILT-IN".equals(manifest.getMainAttributes().getValue("Kibble-Rewrite"))
                 ));
-        String StringUtil = null;
-        if (srv.containsKey("org/apache/commons/lang/StringUtils.class")) {
-            StringUtil = "org/apache/commons/lang/StringUtils";
-        } else if (srv.containsKey("org/apache/commons/lang3/StringUtils.class")) {
-            StringUtil = "org/apache/commons/lang3/StringUtils";
-        } else if (srv.containsKey("org/bukkit/craftbukkit/libs/org/apache/commons/lang/StringUtils.class")) {
-            StringUtil = "org/bukkit/craftbukkit/libs/org/apache/commons/lang/StringUtils";
-        } else if (srv.containsKey("org/bukkit/craftbukkit/libs/org/apache/commons/lang3/StringUtils.class")) {
-            StringUtil = "org/bukkit/craftbukkit/libs/org/apache/commons/lang3/StringUtils";
-        }
         String CraftServer = null;
         for (String entry:srv.keySet()) {
             if (entry.startsWith("org/bukkit/craftbukkit/") && entry.endsWith("/CraftServer.class")) {
@@ -158,6 +152,11 @@ public class KibblePatcher implements Opcodes {
             System.exit(3);
             return;
         }
+        if (this.featuresPatches && !(srv.containsKey("io/papermc/paper/PaperConfig.class") ||
+                srv.containsKey("com/destroystokyo/paper/PaperConfig.class"))) {
+            logger.error("You need a paper based server to use features patches!");
+            return;
+        }
         String NMS = libraryMode ? null : CraftServer.substring(23, CraftServer.lastIndexOf('/'));
         Random accessPkgRnd = new Random();
         String accessPkg = libraryMode ? "net/kibblelands/server/private/" :
@@ -178,21 +177,16 @@ public class KibblePatcher implements Opcodes {
         manifest.getMainAttributes().putValue("Kibble-Version", KIBBLE_VERSION);
         final boolean[] plRewrite = new boolean[]{false};
         if (!libraryMode) {
-            if (manifest.getAttributes("net/minecraft/server/") == null) {
-                Attributes attributes = new Attributes();
-                attributes.putValue("Sealed", "true");
-                manifest.getEntries().put("net/minecraft/server/", attributes);
-            }
             // Patch the 10/20 seconds delay to a 5 seconds delay
             srv.put(CRAFT_BUKKIT_MAIN, patchDelayer(commonGenerator, srv.get(CRAFT_BUKKIT_MAIN)));
             // Patch Server Brand / VersionCommand
-            String NMS_SERVER = "net/minecraft/server/" + NMS + "/MinecraftServer.class";
+            String NMS_SERVER = commonGenerator.mapClass("net/minecraft/server/$NMS/MinecraftServer.class");
             srv.put(NMS_SERVER, patchBrand(srv.get(NMS_SERVER), special));
             srv.put(BUKKIT_VERSION_COMMAND, patchVersionCmd(srv.get(BUKKIT_VERSION_COMMAND), special));
             // Add GC on reload / init to better manage RAM
-            String CRAFT_SERVER = "org/bukkit/craftbukkit/" + NMS + "/CraftServer.class";
+            String CRAFT_SERVER = commonGenerator.mapClass("org/bukkit/craftbukkit/$NMS/CraftServer.class");
             srv.put(CRAFT_SERVER, patchGC(srv.get(CRAFT_SERVER), "reload", stats));
-            String NMS_DEDICATED_SERVER = "net/minecraft/server/" + NMS + "/DedicatedServer.class";
+            String NMS_DEDICATED_SERVER = commonGenerator.mapClass("net/minecraft/server/$NMS/DedicatedServer.class");
             srv.put(NMS_DEDICATED_SERVER, patchGC(srv.get(NMS_DEDICATED_SERVER), "init", stats));
             if (bugFixesPatches) {
                 NPECheckFixes.patch(commonGenerator, srv);
@@ -221,8 +215,8 @@ public class KibblePatcher implements Opcodes {
             NMSAccessOptimizer.patch(commonGenerator, srv);
             // Add features patches
             if (featuresPatches) {
-                DataCommandFeature.install(commonGenerator, srv, stats);
-                EntityPropertiesFeature.install(commonGenerator, srv, inject, stats);
+                DataCommandFeature.install(commonGenerator, srv);
+                EntityPropertiesFeature.install(commonGenerator, srv, inject);
                 BiomeConfigAPIFeature.install(commonGenerator, srv, inject, classDataProvider);
                 DimensionConfigAPIFeature.install(commonGenerator, srv, inject, classDataProvider);
             }
@@ -250,7 +244,6 @@ public class KibblePatcher implements Opcodes {
         }
 
             byte[] FastMathAPI = IOUtils.readResource("net/kibblelands/server/util/FastMath.class");
-            byte[] FastReplaceAPI = IOUtils.readResource("net/kibblelands/server/util/FastReplace.class");
             byte[] FastCollectionsAPI = IOUtils.readResource("net/kibblelands/server/util/FastCollections.class");
             if (!libraryMode) { // Mirror FastMath to MathHelper
                 ClassNode fastMathClassNode = new ClassNode();
@@ -278,36 +271,6 @@ public class KibblePatcher implements Opcodes {
                 ClassWriter classWriter = classDataProvider.newClassWriter();
                 fastMathClassNode.accept(classWriter);
                 FastMathAPI = classWriter.toByteArray();
-                ClassNode fastReplaceClassNode = new ClassNode();
-                new ClassReader(FastReplaceAPI).accept(fastReplaceClassNode, 0);
-                if (StringUtil != null) {
-                    for (MethodNode methodNode : fastReplaceClassNode.methods) {
-                        if (!methodNode.name.startsWith("<")) {
-                            if (methodNode.desc.contains("CharSequence")) {
-                                for (AbstractInsnNode insnNode : methodNode.instructions) {
-                                    if (insnNode.getOpcode() == INVOKESTATIC) {
-                                        MethodInsnNode methodInsnNode = (MethodInsnNode) insnNode;
-                                        if (methodInsnNode.name.equals("replace")) {
-                                            methodInsnNode.owner = StringUtil;
-                                            break;
-                                        }
-                                    }
-                                }
-                            } else {
-                                methodNode.instructions.clear();
-                                methodNode.instructions.add(new VarInsnNode(ALOAD, 0));
-                                methodNode.instructions.add(new VarInsnNode(ALOAD, 1));
-                                methodNode.instructions.add(new VarInsnNode(ALOAD, 2));
-                                methodNode.instructions.add(new MethodInsnNode(INVOKESTATIC,
-                                        StringUtil, "replace", methodNode.desc, false));
-                                methodNode.instructions.add(new InsnNode(ARETURN));
-                            }
-                        }
-                    }
-                    classWriter = classDataProvider.newClassWriter();
-                    fastReplaceClassNode.accept(classWriter);
-                    FastReplaceAPI = classWriter.toByteArray();
-                }
                 ClassNode fastCollectionsClassNode = new ClassNode();
                 if (fast_util_prefix != null) {
                     new ClassReader(FastCollectionsAPI).accept(new ClassRelocator(
@@ -329,15 +292,11 @@ public class KibblePatcher implements Opcodes {
                 fastMathClassNode.accept(new ClassRelocator(classWriter, hideRemapper));
                 inject.put(accessPkg + "FastMath.class", classWriter.toByteArray());
                 classWriter = classDataProvider.newClassWriter();
-                fastReplaceClassNode.accept(new ClassRelocator(classWriter, hideRemapper));
-                inject.put(accessPkg + "FastReplace.class", classWriter.toByteArray());
-                classWriter = classDataProvider.newClassWriter();
                 fastCollectionsClassNode.accept(new ClassRelocator(classWriter, hideRemapper));
                 inject.put(accessPkg + "FastCollections.class", classWriter.toByteArray());
             }
             if (this.featuresPatches) {
                 inject.put("net/kibblelands/server/util/FastMath.class", FastMathAPI);
-                inject.put("net/kibblelands/server/util/FastReplace.class", FastReplaceAPI);
                 inject.put("net/kibblelands/server/util/FastCollections.class", FastCollectionsAPI);
                 commonGenerator.addChangeEntry("Added FastAPI. " + ConsoleColors.CYAN + "(Feature)");
             }
@@ -529,6 +488,8 @@ public class KibblePatcher implements Opcodes {
                     return super.visitMethod(access, name, descriptor, signature, exceptions);
                 }
                 return new MethodVisitor(ASM_BUILD, super.visitMethod(access, name, descriptor, signature, exceptions)) {
+                    boolean specialBranding = false;
+
                     @Override
                     public void visitLdcInsn(Object value) {
                         if (value instanceof String) {
@@ -540,16 +501,25 @@ public class KibblePatcher implements Opcodes {
                                     srv = value + "/Kibble";
                                     break;
                                 case "Spigot":
-                                    srv = "KibbleSpigot";
-                                    break;
                                 case "Paper":
-                                    srv = "KibblePaper";
+                                case "Tuinity":
+                                case "Airplane":
+                                    srv = "Kibble"+ value;
                                     break;
+                                case "Purpur":
+                                    specialBranding = true;
+                                    super.visitLdcInsn(value);
+                                    return;
+                                case "Airplane-Purpur":
+                                    specialBranding = false;
+                                    srv = value + "/Kibble";
                             }
                             if (special) {
                                 srv += "*";
                             }
-                            value = "\u00A7b" + srv + "\u00A7r";
+                            if (!specialBranding) {
+                                value = "\u00A7b" + srv + "\u00A7r";
+                            }
                         }
                         super.visitLdcInsn(value);
                     }
@@ -639,7 +609,7 @@ public class KibblePatcher implements Opcodes {
                 super.visit(version, access, name, signature, superName, interfaces);
                 requireCalc_dontOptimise[1] = (version < V1_6 && !name.startsWith("net/minecraft/server/")
                         && !(name.startsWith("org/bukkit/") && !name.startsWith("org/bukkit/craftbukkit/libs/")));
-                this.isNMS = name.startsWith("net/minecraft/server/") || name.startsWith("org/bukkit/craftbukkit/");
+                this.isNMS = name.startsWith("net/minecraft/") || name.startsWith("org/bukkit/craftbukkit/");
             }
 
             @Override
@@ -663,12 +633,6 @@ public class KibblePatcher implements Opcodes {
                             }
                             super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
                             return;
-                        } else if (opcode == INVOKEVIRTUAL && owner.equals("java/lang/String") &&
-                                name.equals("replace") && descriptor.contains("CharSequence")) {
-                            opcode = INVOKESTATIC;
-                            owner = accessPkg + "FastReplace";
-                            descriptor = replaceDesc;
-                            stats[1]++;
                         }
                         super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
                     }

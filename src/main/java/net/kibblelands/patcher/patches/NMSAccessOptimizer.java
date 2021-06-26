@@ -13,7 +13,7 @@ public class NMSAccessOptimizer implements Opcodes {
     // C++ JVM Code do less checks on public elements
     public static void patch(CommonGenerator commonGenerator, Map<String, byte[]> zip) {
         for (Map.Entry<String, byte[]> entry:zip.entrySet()) {
-            if (((entry.getKey().startsWith("net/minecraft/server/") ||
+            if (((entry.getKey().startsWith("net/minecraft/") ||
                     entry.getKey().startsWith("org/bukkit/craftbukkit/v"))
                     && entry.getKey().endsWith(".class"))) {
                 ClassWriter classWriter = new ClassWriter(0);

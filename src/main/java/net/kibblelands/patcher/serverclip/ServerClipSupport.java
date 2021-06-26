@@ -1,6 +1,8 @@
 package net.kibblelands.patcher.serverclip;
 
+import net.kibblelands.patcher.utils.ASMUtils;
 import net.kibblelands.patcher.utils.IOUtils;
+import org.objectweb.asm.Opcodes;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -13,10 +15,8 @@ import java.util.jar.JarFile;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 
-public class ServerClipSupport {
-    // I don't have the time to finish this
+public final class ServerClipSupport {
     public static final String MC_VER = "$mcVer";
-    private static final boolean LEAGCY_SUPPORT = false;
     private static final int INVALID_ARGS_CODE = -1234;
     private static final File self;
 
@@ -30,7 +30,7 @@ public class ServerClipSupport {
     }
 
     private static final File tmp = new File(new File(System.getProperty("java.io.tmpdir")),
-            "KibblePatcher-" + UUID.randomUUID().toString()).getAbsoluteFile();
+            "KibblePatcher-" + UUID.randomUUID()).getAbsoluteFile();
     private static final File javaHome = new File(System.getProperty("java.home")).getAbsoluteFile();
 
     static {
@@ -39,14 +39,20 @@ public class ServerClipSupport {
 
     private final String mcVer;
     private final ServerClipType serverClipType;
+    private final int minASM;
 
-    private ServerClipSupport(String mcVer, ServerClipType serverClipType) {
+    private ServerClipSupport(String mcVer, ServerClipType serverClipType,int minASM) {
         this.mcVer = mcVer;
         this.serverClipType = serverClipType;
+        this.minASM = minASM;
     }
 
     public String getName() {
         return this.serverClipType.getDisplayName();
+    }
+
+    public int getMinASM() {
+        return minASM;
     }
 
     /**
@@ -68,7 +74,9 @@ public class ServerClipSupport {
                     }
                 }
                 if (version != null) {
-                    return new ServerClipSupport(version, ServerClipType.PAPERCLIP);
+                    return new ServerClipSupport(version, ServerClipType.PAPERCLIP,
+                            jarFile.getEntry("META-INF/versions/16/io/papermc/paperclip/Paperclip.class")
+                                    != null ? Opcodes.V16 : Opcodes.V1_8);
                 }
             }
             // YatoClip support
@@ -83,7 +91,7 @@ public class ServerClipSupport {
                     }
                 }
                 if (version != null) {
-                    return new ServerClipSupport(version, ServerClipType.YATOCLIP);
+                    return new ServerClipSupport(version, ServerClipType.YATOCLIP, Opcodes.V1_8);
                 }
             }
             // Legacy Paperclip support
@@ -99,7 +107,7 @@ public class ServerClipSupport {
                     if (end != -1) version = trimmedJson.substring(index, end);
                 }
                 if (version != null) {
-                    return new ServerClipSupport(version, ServerClipType.PAPERCLIP_LEGACY);
+                    return new ServerClipSupport(version, ServerClipType.PAPERCLIP_LEGACY, Opcodes.V1_8);
                 }
             }
         } catch (IOException ioe) {
@@ -108,8 +116,16 @@ public class ServerClipSupport {
         return null;
     }
 
+    public boolean needNewerJVM() {
+        return minASM > ASMUtils.getJdkSupportedClassFileVersion();
+    }
+
     public File patchServerClip(File paperClip) throws IOException {
         if (mcVer == null) return paperClip;
+        if (this.needNewerJVM()) {
+            throw new IllegalStateException("This " + this.getName() + " require at least java " +
+                    ASMUtils.javaVersionFromClassFileVersion(this.minASM) + " to run!");
+        }
         cleanServerClip();
         IOUtils.mkdirs(tmp);
         int exitCode;
@@ -126,6 +142,7 @@ public class ServerClipSupport {
                         "-jar", paperClip.getAbsolutePath());
             } else {
                 processBuilder = new ProcessBuilder(javaEx.getPath(),
+                        "-Djdk.util.jar.enableMultiRelease=force",
                         "-XX:-UseGCOverheadLimit", "-cp",
                         self.getAbsolutePath() + File.pathSeparator
                                 + paperClip.getAbsolutePath(),

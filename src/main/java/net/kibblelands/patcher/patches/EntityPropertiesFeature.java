@@ -28,8 +28,8 @@ public class EntityPropertiesFeature implements Opcodes {
     private static final String getPropertiesArray = "#getPropertiesArrayImpl";
     private static final String getPropertiesArrayDesc = "(I)[Ljava/lang/Object;";
 
-    public static void install(CommonGenerator commonGenerator,Map<String, byte[]> map, Map<String, byte[]> inject,
-                               final int[] stats) throws IOException {
+    public static void install(CommonGenerator commonGenerator,Map<String, byte[]> map, Map<String, byte[]> inject)
+            throws IOException {
         ClassNode classNode = new ClassNode();
         new ClassReader(map.get(ENTITY)).accept(classNode,0);
         classNode.methods.add(new MethodNode(ACC_PUBLIC|ACC_ABSTRACT|ACC_SYNTHETIC,

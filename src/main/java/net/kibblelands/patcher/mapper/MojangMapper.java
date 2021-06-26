@@ -15,12 +15,21 @@ public class MojangMapper extends NMSMapper {
                 "net/minecraft/world/entity/ai/behavior/BehaviorInteractDoor");
         this.clMap.put("net/minecraft/server/$NMS/BehaviorController",
                 "net/minecraft/world/entity/ai/BehaviorController");
+        this.clMap.put("net/minecraft/server/$NMS/BiomeBase", "net/minecraft/world/level/biome/BiomeBase");
+        this.clMap.put("net/minecraft/server/$NMS/BiomeFog", "net/minecraft/world/level/biome/BiomeFog");
+        this.clMap.put("net/minecraft/server/$NMS/BiomeFog$GrassColor",
+                "net/minecraft/world/level/biome/BiomeFog$GrassColor");
+        this.clMap.put("net/minecraft/server/$NMS/BiomeParticles",
+                "net/minecraft/world/level/biome/BiomeParticles");
         this.clMap.put("net/minecraft/server/$NMS/Block", "net/minecraft/world/level/block/Block");
         this.clMap.put("net/minecraft/server/$NMS/IBlockData", "net/minecraft/world/level/block/state/IBlockData");
         this.clMap.put("net/minecraft/server/$NMS/BaseBlockPosition", "net/minecraft/core/BaseBlockPosition");
         this.clMap.put("net/minecraft/server/$NMS/BlockPosition", "net/minecraft/core/BlockPosition");
         this.clMap.put("net/minecraft/server/$NMS/BlockPosition$MutableBlockPosition",
                 "net/minecraft/core/BlockPosition$MutableBlockPosition");
+        this.clMap.put("net/minecraft/server/$NMS/DedicatedServer", "net/minecraft/server/dedicated/DedicatedServer");
+        this.clMap.put("net/minecraft/server/$NMS/DimensionManager",
+                "net/minecraft/world/level/dimension/DimensionManager");
         this.clMap.put("net/minecraft/server/$NMS/IChatBaseComponent",
                 "net/minecraft/network/chat/IChatBaseComponent");
         this.clMap.put("net/minecraft/server/$NMS/ChatMessage", "net/minecraft/network/chat/ChatMessage");
@@ -29,14 +38,24 @@ public class MojangMapper extends NMSMapper {
         this.clMap.put("net/minecraft/server/$NMS/ChunkProviderServer",
                 "net/minecraft/server/level/ChunkProviderServer");
         this.clMap.put("net/minecraft/server/$NMS/ChunkStatus", "net/minecraft/world/level/chunk/ChunkStatus");
+        this.clMap.put("net/minecraft/server/$NMS/CommandDataAccessorEntity",
+                "net/minecraft/server/commands/data/CommandDataAccessorEntity");
+        this.clMap.put("net/minecraft/server/$NMS/EntityHuman",
+                "net/minecraft/world/entity/player/EntityHuman");
         this.clMap.put("net/minecraft/server/$NMS/LoginListener", "net/minecraft/server/network/LoginListener");
         this.clMap.put("net/minecraft/server/$NMS/MathHelper", "net/minecraft/util/MathHelper");
+        this.clMap.put("net/minecraft/server/$NMS/MinecraftServer", "net/minecraft/server/MinecraftServer");
+        this.clMap.put("net/minecraft/server/$NMS/Music", "net/minecraft/sounds/Music");
         this.clMap.put("net/minecraft/server/$NMS/PacketLoginInEncryptionBegin",
                 "net/minecraft/network/protocol/login/PacketLoginInEncryptionBegin");
         this.clMap.put("net/minecraft/server/$NMS/PacketPlayInBEdit",
                 "net/minecraft/network/protocol/game/PacketPlayInBEdit");
+        this.clMap.put("net/minecraft/server/$NMS/ParticleParam", "net/minecraft/core/particles/ParticleParam");
+        this.clMap.put("net/minecraft/server/$NMS/SoundEffect", "net/minecraft/sounds/SoundEffect");
         this.clMap.put("net/minecraft/server/$NMS/TileEntityFurnace",
                 "net/minecraft/world/level/block/entity/TileEntityFurnace");
+        this.clMap.put("net/minecraft/server/$NMS/World", "net/minecraft/world/level/World");
+        this.clMap.put("net/minecraft/server/$NMS/WorldServer", "net/minecraft/server/level/WorldServer");
     }
 
     @Override

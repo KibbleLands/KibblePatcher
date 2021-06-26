@@ -11,7 +11,7 @@ public class DataCommandFeature implements Opcodes {
     private static final String dataAccessorEntity = "net/minecraft/server/$NMS/CommandDataAccessorEntity.class";
     private static final String entityHuman = "net/minecraft/server/$NMS/EntityHuman";
 
-    public static void install(CommonGenerator commonGenerator,Map<String, byte[]> map, final int[] stats) {
+    public static void install(CommonGenerator commonGenerator,Map<String, byte[]> map) {
         String resolvedDataAccessorEntity = commonGenerator.mapClass(dataAccessorEntity);
         byte[] dataAccessorEntity = map.get(resolvedDataAccessorEntity);
         final boolean[] didWork = new boolean[]{false};

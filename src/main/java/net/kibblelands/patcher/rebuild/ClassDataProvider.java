@@ -42,6 +42,7 @@ public class ClassDataProvider {
         final String name;
         String superClass;
         int access;
+        boolean stub;
 
         private ClData(String name) {
             this.name = name;
@@ -144,7 +145,7 @@ public class ClassDataProvider {
             ClassData[] classData = new ClassData[interfaces.size()];
             int i = 0;
             for (String inName:interfaces) {
-                classData[i] = getClassData(inName, true);
+                classData[i] = getClassData(inName, true, true);
                 i++;
             }
             return classData;
@@ -203,10 +204,15 @@ public class ClassDataProvider {
     }
 
     public ClData getClassData(String clName) {
-        return this.getClassData(clName, false);
+        return this.getClassData(clName, false, true);
     }
 
-    private ClData getClassData(String clName,boolean defaultToInterface) {
+    public ClData getRealClassData(String clName) {
+        ClData clData = this.getClassData(clName, false, false);
+        return clData == null || clData.stub ? null : clData;
+    }
+
+    private ClData getClassData(String clName,boolean defaultToInterface,boolean allowStub) {
         if (clName.endsWith(";")) {
             throw new IllegalArgumentException("Can't put desc as class Data -> "+clName);
         }
@@ -245,7 +251,11 @@ public class ClassDataProvider {
                     ((ClData2) clData).interfaces = Arrays.asList(interfaces);
                 }
             } catch (Exception e2) {
+                if (!allowStub) {
+                    return null;
+                }
                 clData.superClass = "java/lang/Object";
+                clData.stub = true;
                 if (defaultToInterface) {
                     clData.access |= ACC_INTERFACE | ACC_ABSTRACT;
                 }

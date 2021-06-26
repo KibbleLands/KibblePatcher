@@ -13,6 +13,64 @@ import java.util.function.Predicate;
 
 public class ASMUtils implements Opcodes {
     public static final int ASM_BUILD = ASM9;
+    public static final int ASM_MAX_SUPPORTED = V17;
+
+    private static Integer jdkSupportedClassFileVersion;
+
+    public static int getJdkSupportedClassFileVersion() {
+        if (jdkSupportedClassFileVersion == null) {
+            String prop = System.getProperty("java.class.version");
+            int index = prop.indexOf('.');
+            if (index == -1) {
+                jdkSupportedClassFileVersion = Integer.parseInt(prop);
+            } else {
+                jdkSupportedClassFileVersion =
+                        Integer.parseInt(prop.substring(0, index));
+            }
+        }
+        return jdkSupportedClassFileVersion;
+    }
+
+    public static int javaVersionFromClassFileVersion(int classFileVersion) {
+        switch (classFileVersion) {
+            default:
+                throw new IllegalArgumentException("Unknown api: " + classFileVersion);
+            case Opcodes.V1_1:
+                return 1;
+            case Opcodes.V1_2:
+                return 2;
+            case Opcodes.V1_3:
+                return 3;
+            case Opcodes.V1_4:
+                return 4;
+            case Opcodes.V1_5:
+                return 5;
+            case Opcodes.V1_6:
+                return 6;
+            case Opcodes.V1_7:
+                return 7;
+            case Opcodes.V1_8:
+                return 8;
+            case Opcodes.V9:
+                return 9;
+            case Opcodes.V10:
+                return 10;
+            case Opcodes.V11:
+                return 11;
+            case Opcodes.V12:
+                return 12;
+            case Opcodes.V13:
+                return 13;
+            case Opcodes.V14:
+                return 14;
+            case Opcodes.V15:
+                return 15;
+            case Opcodes.V16:
+                return 16;
+            case Opcodes.V17:
+                return 17;
+        }
+    }
 
     public static boolean hasField(ClassNode classNode,String fieldName) {
         for (FieldNode fieldNode:classNode.fields) {
@@ -240,6 +298,29 @@ public class ASMUtils implements Opcodes {
                 break;
         }
         methodNodeStub.instructions.add(new InsnNode(opcode));
+        classNode.methods.add(methodNodeStub);
+        if ((classNode.access & ACC_INTERFACE) != 0 && classNode.version < V1_8) {
+            classNode.version = V1_8;
+        }
+    }
+
+    public static void createSuperCaller(ClassNode classNode, String name,String desc) {
+        MethodNode methodNodeStub = new MethodNode(ACC_PUBLIC, name, desc, null, null);
+        LabelNode labelNode = new LabelNode();
+        InsnList instructions = methodNodeStub.instructions;
+        instructions.add(labelNode);
+        instructions.add(new LineNumberNode(12345, labelNode));
+        int max = 1;
+        instructions.add(new VarInsnNode(ALOAD, 0));
+        for (Type type:Type.getArgumentTypes(desc)) {
+            instructions.add(new VarInsnNode(type.getOpcode(ILOAD), max));
+            max += type.getSize();
+        }
+        instructions.add(new MethodInsnNode(INVOKESPECIAL, classNode.superName, name, desc, false));
+        Type returnType = Type.getMethodType(desc).getReturnType();
+        instructions.add(new InsnNode(returnType.getOpcode(IRETURN)));
+        methodNodeStub.maxLocals = max;
+        methodNodeStub.maxStack = Math.max(max, returnType.getSize());
         classNode.methods.add(methodNodeStub);
         if ((classNode.access & ACC_INTERFACE) != 0 && classNode.version < V1_8) {
             classNode.version = V1_8;

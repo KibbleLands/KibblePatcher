@@ -32,39 +32,14 @@ public class MethodResultCacheOptimizer implements Opcodes {
             commonGenerator.addChangeEntry("Cache furnace fuel list " + ConsoleColors.CYAN + "(Optimisation)");
         }
         bytes = map.get(commonGenerator.mapClass(BLOCK_POSITION));
-        // TODO Rework the patch
-        if (bytes != null && false) { // Disabled temporary
-            boolean mutableException = map.containsKey(commonGenerator.mapClass(MUTABLE_BLOCK_POSITION));
+        // Disabled if recent version, on old it work great, but on resents versions it cause problems
+        if (bytes != null && !map.containsKey(commonGenerator.mapClass(MUTABLE_BLOCK_POSITION))) {
             ClassNode classNode = new ClassNode();
             new ClassReader(bytes).accept(classNode, 0);
-            if (cacheHashCode(classNode, !mutableException, false)) {
-                String baseBlockPos = classNode.superName;
-                if (!"java/lang/Object".equals(baseBlockPos)) {
-                    ClassWriter classWriter = new ClassWriter(0);
-                    new ClassReader(map.get(baseBlockPos + ".class")).accept(new ClassVisitor(ASMUtils.ASM_BUILD, classWriter) {
-                        @Override
-                        public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
-                            if (name.equals("hashCode") && descriptor.equals("()I")) {
-                                access &= ~ACC_FINAL;
-                            }
-                            return super.visitMethod(access, name, descriptor, signature, exceptions);
-                        }
-                    }, 0);
-                    map.put(baseBlockPos + ".class", classWriter.toByteArray());
-                }
+            if ("java/lang/Object".equals(classNode.superName) && cacheHashCode(classNode, true, false)) {
                 ClassWriter classWriter = new ClassWriter(0);
                 classNode.accept(classWriter);
                 map.put(commonGenerator.mapClass(BLOCK_POSITION), classWriter.toByteArray());
-                if (mutableException) {
-                    bytes = map.get(commonGenerator.mapClass(MUTABLE_BLOCK_POSITION));
-                    classNode = new ClassNode();
-                    new ClassReader(bytes).accept(classNode, 0);
-                    if (cacheHashCode(classNode, false, true, baseBlockPos)) {
-                        classWriter = new ClassWriter(0);
-                        classNode.accept(classWriter);
-                        map.put(commonGenerator.mapClass(MUTABLE_BLOCK_POSITION), classWriter.toByteArray());
-                    }
-                }
                 commonGenerator.addChangeEntry("Cache BlockPosition hash " + ConsoleColors.CYAN + "(Optimisation)");
             }
         }
