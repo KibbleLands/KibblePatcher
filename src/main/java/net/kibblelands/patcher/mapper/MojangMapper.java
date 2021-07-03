@@ -9,12 +9,12 @@ public class MojangMapper extends NMSMapper {
 
     public MojangMapper(String nms) {
         super(nms);
+        this.clMap.put("net/minecraft/server/$NMS/BehaviorController",
+                "net/minecraft/world/entity/ai/BehaviorController");
         this.clMap.put("net/minecraft/server/$NMS/BehaviorInteract",
                 "net/minecraft/world/entity/ai/behavior/BehaviorInteract");
         this.clMap.put("net/minecraft/server/$NMS/BehaviorInteractDoor",
                 "net/minecraft/world/entity/ai/behavior/BehaviorInteractDoor");
-        this.clMap.put("net/minecraft/server/$NMS/BehaviorController",
-                "net/minecraft/world/entity/ai/BehaviorController");
         this.clMap.put("net/minecraft/server/$NMS/BiomeBase", "net/minecraft/world/level/biome/BiomeBase");
         this.clMap.put("net/minecraft/server/$NMS/BiomeFog", "net/minecraft/world/level/biome/BiomeFog");
         this.clMap.put("net/minecraft/server/$NMS/BiomeFog$GrassColor",
@@ -40,8 +40,9 @@ public class MojangMapper extends NMSMapper {
         this.clMap.put("net/minecraft/server/$NMS/ChunkStatus", "net/minecraft/world/level/chunk/ChunkStatus");
         this.clMap.put("net/minecraft/server/$NMS/CommandDataAccessorEntity",
                 "net/minecraft/server/commands/data/CommandDataAccessorEntity");
-        this.clMap.put("net/minecraft/server/$NMS/EntityHuman",
-                "net/minecraft/world/entity/player/EntityHuman");
+        this.clMap.put("net/minecraft/server/$NMS/EntityAnimal", "net/minecraft/world/entity/animal/EntityAnimal");
+        this.clMap.put("net/minecraft/server/$NMS/EntityHuman", "net/minecraft/world/entity/player/EntityHuman");
+        this.clMap.put("net/minecraft/server/$NMS/EntityLiving", "net/minecraft/world/entity/EntityLiving");
         this.clMap.put("net/minecraft/server/$NMS/LoginListener", "net/minecraft/server/network/LoginListener");
         this.clMap.put("net/minecraft/server/$NMS/MathHelper", "net/minecraft/util/MathHelper");
         this.clMap.put("net/minecraft/server/$NMS/MinecraftServer", "net/minecraft/server/MinecraftServer");
@@ -51,6 +52,8 @@ public class MojangMapper extends NMSMapper {
         this.clMap.put("net/minecraft/server/$NMS/PacketPlayInBEdit",
                 "net/minecraft/network/protocol/game/PacketPlayInBEdit");
         this.clMap.put("net/minecraft/server/$NMS/ParticleParam", "net/minecraft/core/particles/ParticleParam");
+        this.clMap.put("net/minecraft/server/$NMS/PathfinderGoalFollowParent",
+                "net/minecraft/world/entity/ai/goal/PathfinderGoalFollowParent");
         this.clMap.put("net/minecraft/server/$NMS/SoundEffect", "net/minecraft/sounds/SoundEffect");
         this.clMap.put("net/minecraft/server/$NMS/TileEntityFurnace",
                 "net/minecraft/world/level/block/entity/TileEntityFurnace");

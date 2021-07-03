@@ -26,7 +26,7 @@ public class DimensionConfigAPIFeature implements Opcodes {
     };
 
     public static void install(CommonGenerator commonGenerator, Map<String, byte[]> map,
-                               Map<String, byte[]> inject, ClassDataProvider cdp) throws IOException {
+                               Map<String, byte[]> inject) throws IOException {
         if (!ASMUtils.supportRemoteDataEdit(map)) return; // Skip on pre 1.16.2
         String DIMENSION_MANAGER = commonGenerator.mapClass(NMS_DIMENSION_MANAGER);
         String WORLD = commonGenerator.mapClass(NMS_WORLD);

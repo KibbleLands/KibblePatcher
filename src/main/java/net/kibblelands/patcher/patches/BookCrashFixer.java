@@ -92,7 +92,7 @@ public class BookCrashFixer implements Opcodes {
         ClassWriter classWriter = new ClassWriter(0);
         classNode.accept(classWriter);
         map.put(PLAYER_CONNECTION+".class", classWriter.toByteArray());
-        commonGenerator.addChangeEntry("Added mitigation against the BookCrashExploit " + ConsoleColors.CYAN + "(Security)");
+        commonGenerator.addChangeEntry("Added mitigation against the CustomPacketPayload exploit " + ConsoleColors.CYAN + "(Security)");
         stats[5]++;
     }
 

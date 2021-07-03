@@ -92,7 +92,7 @@ public class PluginRewriteOptimiser implements Opcodes {
             insnNodes.add(new JumpInsnNode(IFEQ, end));
             insnNodes.add(new VarInsnNode(ALOAD, 3));
             insnNodes.add(new LdcInsnNode("/math/"));
-            insnNodes.add(new MethodInsnNode(INVOKEVIRTUAL, "java/lang/String", "contains", "(Ljava/lang/String;)Z"));
+            insnNodes.add(new MethodInsnNode(INVOKEVIRTUAL, "java/lang/String", "contains", "(Ljava/lang/CharSequence;)Z"));
             insnNodes.add(new JumpInsnNode(IFEQ, end));
             insnNodes.add(new VarInsnNode(ALOAD, 0));
             insnNodes.add(new InsnNode(ICONST_1));

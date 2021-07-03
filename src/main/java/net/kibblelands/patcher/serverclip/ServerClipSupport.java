@@ -144,8 +144,8 @@ public final class ServerClipSupport {
                 processBuilder = new ProcessBuilder(javaEx.getPath(),
                         "-Djdk.util.jar.enableMultiRelease=force",
                         "-XX:-UseGCOverheadLimit", "-cp",
-                        self.getAbsolutePath() + File.pathSeparator
-                                + paperClip.getAbsolutePath(),
+                        paperClip.getAbsolutePath() + File.pathSeparator
+                                + self.getAbsolutePath(),
                         "net.kibblelands.patcher.serverclip.ServerClipSupport",
                         this.serverClipType.name(), mcVer);
             }

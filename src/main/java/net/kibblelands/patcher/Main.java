@@ -22,12 +22,16 @@ public final class Main {
 
     public static void main(String[] args) throws IOException {
         boolean fullPatch = false;
+        boolean litePatch = false;
         boolean generate = false;
         String xlistFilter = "";
         if (args.length == 3) {
             if (("-full".equals(args[0]))) {
                 args = new String[]{args[1], args[2]};
                 fullPatch = true;
+            } else if (("-lite".equals(args[0]))) {
+                args = new String[]{args[1], args[2]};
+                litePatch = true;
             } else if (("-generate".equals(args[0]))) {
                 args = new String[]{args[1], args[2]};
                 generate = true;
@@ -44,8 +48,10 @@ public final class Main {
             LOGGER.stdout("Usage: \n" +
                     "    java -jar KibblePatcher.jar <input> <output>\n" +
                     "    java -jar KibblePatcher.jar -full <input> <output>\n" +
+                    "    java -jar KibblePatcher.jar -lite <input> <output>\n" +
                     "    java -jar KibblePatcher.jar -patch <file>\n" +
                     "    java -jar KibblePatcher.jar -patch-full <file>\n" +
+                    "    java -jar KibblePatcher.jar -patch-lite <file>\n" +
                     "    java -jar KibblePatcher.jar -generate <input> <output>\n" +
                     "    java -jar KibblePatcher.jar -info <file>\n"+
                     "    java -jar KibblePatcher.jar -links\n");
@@ -179,6 +185,9 @@ public final class Main {
         if (args[0].equals("-patch-full")) {
             args[0] = "-patch";
             fullPatch = true;
+        } else if (args[0].equals("-patch-lite")) {
+            args[0] = "-patch";
+            litePatch = true;
         }
         File in = new File(args[args[0].equals("-patch") ? 1 : 0]);
         if (!in.exists()) {
@@ -189,6 +198,8 @@ public final class Main {
         KibblePatcher kibblePatcher = new KibblePatcher(LOGGER);
         if (fullPatch) {
             kibblePatcher.featuresPatches = true;
+        } else if (litePatch) {
+            kibblePatcher.compatibilityPatches = false;
         }
         try {
             kibblePatcher.patchServerJar(in, new File(args[1]));

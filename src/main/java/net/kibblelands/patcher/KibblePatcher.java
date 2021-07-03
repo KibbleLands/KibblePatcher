@@ -37,7 +37,7 @@ public class KibblePatcher implements Opcodes {
     private static final String BUKKIT_API = "org/bukkit/Bukkit.class";
     private static final String BUKKIT_VERSION_COMMAND = "org/bukkit/command/defaults/VersionCommand.class";
     private static final CancellationException SKIP = new CancellationException();
-    public static final String KIBBLE_VERSION = "1.7-dev04";
+    public static final String KIBBLE_VERSION = "1.7-dev05";
     // Enable dev warnings if the version contains "-dev"
     @SuppressWarnings("ALL")
     public static final boolean DEV_BUILD = KIBBLE_VERSION.contains("-dev") ||
@@ -206,8 +206,8 @@ public class KibblePatcher implements Opcodes {
                 AuthentificationHardening.patch(commonGenerator, srv, stats);
             }
             // Specific optimisations
-            ChunkCacheOptimizer.patch(commonGenerator, srv, stats);
-            MethodResultCacheOptimizer.patch(commonGenerator, srv, stats);
+            ChunkCacheOptimizer.patch(commonGenerator, srv);
+            MethodResultCacheOptimizer.patch(commonGenerator, srv);
             BlockDataOptimiser.patch(commonGenerator, srv, stats);
             if (!isRewriteInstalled) {
                 PluginRewriteOptimiser.patch(commonGenerator, srv, inject, accessPkg, plRewrite);
@@ -218,7 +218,8 @@ public class KibblePatcher implements Opcodes {
                 DataCommandFeature.install(commonGenerator, srv);
                 EntityPropertiesFeature.install(commonGenerator, srv, inject);
                 BiomeConfigAPIFeature.install(commonGenerator, srv, inject, classDataProvider);
-                DimensionConfigAPIFeature.install(commonGenerator, srv, inject, classDataProvider);
+                DimensionConfigAPIFeature.install(commonGenerator, srv, inject);
+                AnimalParentOverrideFeature.install(commonGenerator, srv);
             }
             // Save in the jar if plugin rewrite is supported/installed
             manifest.getMainAttributes().putValue("Kibble-Rewrite",
@@ -229,6 +230,7 @@ public class KibblePatcher implements Opcodes {
                 EntityPropertiesFeature.installLib(inject);
                 BiomeConfigAPIFeature.installLib(srv, inject);
                 DimensionConfigAPIFeature.installLib(srv, inject);
+                AnimalParentOverrideFeature.installLib(srv);
             }
         }
         if (compatibilityPatches) {
@@ -587,9 +589,6 @@ public class KibblePatcher implements Opcodes {
         patchClassOpt(p, cdp,fast_util_prefix, Math, stats, FIRST_PASS, accessPkg);
     }
 
-    private static final String replaceDesc =
-            "(Ljava/lang/String;Ljava/lang/CharSequence;Ljava/lang/CharSequence;)Ljava/lang/String;";
-
     private void patchClassOpt(final Map.Entry<String, byte[]> p,ClassDataProvider cdp, String fast_util_prefix,
                                String Math, final int[] stats,final int err,final String accessPkg) throws IOException {
         boolean[] requireCalc_dontOptimise = new boolean[]{false, false};
@@ -796,7 +795,7 @@ public class KibblePatcher implements Opcodes {
     public static void printSupportLinks(Logger logger) {
         logger.info("If you find any bug report them here ->\n" +
                 ConsoleColors.CYAN + "    " + GITHUB_CREATE_ISSUE);
-        logger.info("Or you join our Discord server here ->\n" +
-                ConsoleColors.CYAN + "    " + DISCORD_JOIN_LINK);
+        /* logger.info("Or you join our Discord server here ->\n" +
+                ConsoleColors.CYAN + "    " + DISCORD_JOIN_LINK); */
     }
 }

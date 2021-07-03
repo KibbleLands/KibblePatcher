@@ -15,7 +15,7 @@ public class MethodResultCacheOptimizer implements Opcodes {
     private static final String CRAFT_BLOCK = "org/bukkit/craftbukkit/$NMS/block/CraftBlock.class";
     private static final String LOCATION = "org/bukkit/Location.class";
 
-    public static void patch(CommonGenerator commonGenerator,Map<String, byte[]> map, final int[] stats) {
+    public static void patch(CommonGenerator commonGenerator,Map<String, byte[]> map) {
         byte[] bytes = map.get(commonGenerator.mapClass(FURNACE_TILE));
         if (bytes != null) {
             ClassNode classNode = new ClassNode();
@@ -24,7 +24,6 @@ public class MethodResultCacheOptimizer implements Opcodes {
                     commonGenerator.mapDesc("()Ljava/util/Map<Lnet/minecraft/server/$NMS/Item;Ljava/lang/Integer;>;"));
             if (methodNode != null) {
                 cacheMethodResult(classNode, methodNode);
-                stats[4]++;
             }
             ClassWriter classWriter = new ClassWriter(0);
             classNode.accept(classWriter);

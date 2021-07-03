@@ -16,7 +16,7 @@ public class ChunkCacheOptimizer implements Opcodes {
     private static final String NMS_CHUNK_STATUS = "net/minecraft/server/$NMS/IChunkAccess";
     private static final String NMS_CHUNK_ACCESS = "net/minecraft/server/$NMS/ChunkStatus";
 
-    public static void patch(CommonGenerator commonGenerator,Map<String, byte[]> map, final int[] stats) {
+    public static void patch(CommonGenerator commonGenerator,Map<String, byte[]> map) {
         String CHUNK_PROVIDER = commonGenerator.mapClass(NMS_CHUNK_PROVIDER);
         String CHUNK_STATUS = commonGenerator.mapClass(NMS_CHUNK_STATUS);
         String CHUNK_ACCESS = commonGenerator.mapClass(NMS_CHUNK_ACCESS);

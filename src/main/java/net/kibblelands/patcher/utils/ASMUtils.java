@@ -1,14 +1,13 @@
 package net.kibblelands.patcher.utils;
 
 import org.objectweb.asm.Handle;
+import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
 
-import java.util.IdentityHashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.lang.ref.WeakReference;
+import java.util.*;
 import java.util.function.Predicate;
 
 public class ASMUtils implements Opcodes {
@@ -217,18 +216,24 @@ public class ASMUtils implements Opcodes {
      * @param methodNode The patched method
      * @param from Original instruction
      * @param to Target instruction
-     * @return Number of patched instructions
      */
-    public static int replaceInstruction(MethodNode methodNode, AbstractInsnNode from,AbstractInsnNode to) {
-        int patches = 0;
+    public static void replaceInstruction(MethodNode methodNode, AbstractInsnNode from,AbstractInsnNode to) {
         for (AbstractInsnNode current:methodNode.instructions.toArray()) {
-            if (!equals(current, from)) {
-                continue;
+            if (equals(current, from)) {
+                methodNode.instructions.set(current, to.clone(null));
             }
-            methodNode.instructions.set(current, to.clone(null));
-            patches++;
         }
-        return patches;
+    }
+
+    /**
+     * @param classNode The patched class
+     * @param from Original instruction
+     * @param to Target instruction
+     */
+    public static void replaceInstruction(ClassNode classNode, AbstractInsnNode from,AbstractInsnNode to) {
+        for (MethodNode methodNode:classNode.methods) {
+            replaceInstruction(methodNode, from, to);
+        }
     }
 
     public static void symlinkMethod(ClassNode classNode, String target,String link) {
@@ -267,13 +272,21 @@ public class ASMUtils implements Opcodes {
         createStub(classNode, name, desc, false);
     }
 
+    public static void createAPIStub(ClassNode classNode, String name,String desc) {
+        createStub(classNode, name, desc, false, true);
+    }
+
     public static void createStaticStub(ClassNode classNode, String name,String desc) {
         createStub(classNode, name, desc, true);
     }
 
     public static void createStub(ClassNode classNode, String name,String desc, boolean isStatic) {
+        createStub(classNode, name, desc, isStatic, false);
+    }
+
+    public static void createStub(ClassNode classNode, String name,String desc, boolean isStatic,boolean api) {
         MethodNode methodNodeStub = new MethodNode(ACC_PUBLIC|
-                ACC_SYNTHETIC|(isStatic?ACC_STATIC:0), name, desc, null, null);
+                (api?0:ACC_SYNTHETIC)|(isStatic?ACC_STATIC:0), name, desc, null, null);
         LabelNode labelNode = new LabelNode();
         methodNodeStub.instructions.add(labelNode);
         methodNodeStub.instructions.add(new LineNumberNode(12345, labelNode));
@@ -328,8 +341,23 @@ public class ASMUtils implements Opcodes {
     }
 
     public static boolean equals(AbstractInsnNode insn1,AbstractInsnNode insn2) {
-        return insn1.getOpcode() == insn2.getOpcode()
-                && (!(insn1 instanceof IntInsnNode) || ((IntInsnNode) insn1).operand == ((IntInsnNode) insn2).operand);
+        if (insn1.getOpcode() != insn2.getOpcode() ||
+                insn1.getType() != insn2.getType()) return false;
+        switch (insn1.getType()) {
+            case AbstractInsnNode.INT_INSN:
+                return ((IntInsnNode) insn1).operand == ((IntInsnNode) insn2).operand;
+            case AbstractInsnNode.FIELD_INSN:
+                return Objects.equals(((FieldInsnNode) insn1).owner, ((FieldInsnNode) insn2).owner) &&
+                        Objects.equals(((FieldInsnNode) insn1).name, ((FieldInsnNode) insn2).name) &&
+                        Objects.equals(((FieldInsnNode) insn1).desc, ((FieldInsnNode) insn2).desc);
+            case AbstractInsnNode.METHOD_INSN:
+                return Objects.equals(((MethodInsnNode) insn1).owner, ((MethodInsnNode) insn2).owner) &&
+                        Objects.equals(((MethodInsnNode) insn1).name, ((MethodInsnNode) insn2).name) &&
+                        Objects.equals(((MethodInsnNode) insn1).desc, ((MethodInsnNode) insn2).desc) &&
+                        ((MethodInsnNode) insn1).itf == ((MethodInsnNode) insn2).itf;
+            default: // In most case it's true, but not if opcode is -1
+                return true;
+        }
     }
 
     public static List<AbstractInsnNode> findNodes(InsnList instructions, Predicate<AbstractInsnNode> check){
@@ -460,5 +488,53 @@ public class ASMUtils implements Opcodes {
         } else if (prev.getOpcode() == CHECKCAST) {
             return ((TypeInsnNode) prev).desc;
         } else return "java/lang/Object";
+    }
+
+    public static final String OBJECT = "java/lang/Object";
+    public static final String WEAK_REFERENCE = "java/lang/ref/WeakReference";
+
+    public static void passUnReference(InsnList insnList,String reference,String type) {
+        insnList.add(new InsnNode(DUP));
+        LabelNode nonNull = new LabelNode();
+        LabelNode end = new LabelNode();
+        insnList.add(new JumpInsnNode(IFNONNULL, nonNull));
+        // We need to do that for the stack to be valid for the JVM
+        insnList.add(new InsnNode(POP));
+        insnList.add(new InsnNode(ACONST_NULL));
+        insnList.add(new JumpInsnNode(GOTO, end));
+        insnList.add(nonNull);
+        insnList.add(new MethodInsnNode(INVOKEVIRTUAL, reference, "get", "()Ljava/lang/Object;", false));
+        if (!"java/lang/Object".equals(type)) {
+            insnList.add(new TypeInsnNode(CHECKCAST, type));
+        }
+        insnList.add(end);
+    }
+
+    public static void passUnReferenceOr(InsnList insnList,String reference,String type,LabelNode ifNullPop) {
+        insnList.add(new InsnNode(DUP));
+        insnList.add(new JumpInsnNode(IFNULL, ifNullPop));
+        insnList.add(new MethodInsnNode(INVOKEVIRTUAL, reference, "get", "()Ljava/lang/Object;", false));
+        insnList.add(new InsnNode(DUP));
+        insnList.add(new JumpInsnNode(IFNULL, ifNullPop));
+        if (!"java/lang/Object".equals(type)) {
+            insnList.add(new TypeInsnNode(CHECKCAST, type));
+        }
+    }
+
+    public static void passReference(InsnList insnList,String reference) {
+        LabelNode nonNull = new LabelNode();
+        LabelNode end = new LabelNode();
+        insnList.add(new InsnNode(DUP)); // O O
+        insnList.add(new JumpInsnNode(IFNONNULL, nonNull));
+        // We need to do that for the stack to be valid for the JVM
+        insnList.add(new InsnNode(POP));
+        insnList.add(new InsnNode(ACONST_NULL));
+        insnList.add(new JumpInsnNode(GOTO, end));
+        insnList.add(nonNull); // O
+        insnList.add(new TypeInsnNode(NEW, reference)); // O R
+        insnList.add(new InsnNode(DUP_X1)); // R O R
+        insnList.add(new InsnNode(SWAP)); // R R O
+        insnList.add(new MethodInsnNode(INVOKESPECIAL, reference, "<init>", "(Ljava/lang/Object;)V", false));
+        insnList.add(end); // R
     }
 }

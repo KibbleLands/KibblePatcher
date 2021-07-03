@@ -5,6 +5,11 @@ This api allow to change a Biome properties such as color or particles
 Note: BiomeConfig is sent to the client only when they join the server,
 changing the configuration will only update the client behaviour on join
 
+/!\\ `Biome.CUSTOM` is not compatible with `.getConfig()`, you can add an exception with
+```Java
+if (biome.name().equals("CUSTOM"))
+```
+
 ---------------------------------------
 
 Example of API use:
