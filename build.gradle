@@ -6,7 +6,7 @@ plugins {
 }
 
 group 'org.example'
-version '1.7-dev05'
+version '1.7.0'
 
 targetCompatibility = 1.8
 sourceCompatibility = 1.8
