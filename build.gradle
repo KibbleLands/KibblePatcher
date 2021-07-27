@@ -6,7 +6,7 @@ plugins {
 }
 
 group 'org.example'
-version '1.7.0'
+version '1.7.1'
 
 targetCompatibility = 1.8
 sourceCompatibility = 1.8
@@ -45,10 +45,10 @@ afterEvaluate {
 }
 
 dependencies {
-    implementation 'org.ow2.asm:asm-commons:9.1'
-    shadow 'org.ow2.asm:asm-commons:9.1'
-    implementation 'org.fusesource.jansi:jansi:2.3.1'
-    shadow 'org.fusesource.jansi:jansi:2.3.1'
+    implementation 'org.ow2.asm:asm-commons:9.2'
+    shadow 'org.ow2.asm:asm-commons:9.2'
+    implementation 'org.fusesource.jansi:jansi:2.3.4'
+    shadow 'org.fusesource.jansi:jansi:2.3.4'
     // Bukkit dependency (Only used in net.kibblelands.server.*)
     compileOnly('com.destroystokyo.paper:paper-api:1.16.5-R0.1-SNAPSHOT')
 }
