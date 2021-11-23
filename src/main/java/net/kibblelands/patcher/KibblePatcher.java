@@ -37,7 +37,7 @@ public class KibblePatcher implements Opcodes {
     private static final String BUKKIT_API = "org/bukkit/Bukkit.class";
     private static final String BUKKIT_VERSION_COMMAND = "org/bukkit/command/defaults/VersionCommand.class";
     private static final CancellationException SKIP = new CancellationException();
-    public static final String KIBBLE_VERSION = "1.7.1";
+    public static final String KIBBLE_VERSION = "1.7.2";
     // Enable dev warnings if the version contains "-dev"
     @SuppressWarnings("ALL")
     public static final boolean DEV_BUILD = KIBBLE_VERSION.contains("-dev") ||

@@ -74,9 +74,17 @@ public final class ServerClipSupport {
                     }
                 }
                 if (version != null) {
-                    return new ServerClipSupport(version, ServerClipType.PAPERCLIP,
-                            jarFile.getEntry("META-INF/versions/16/io/papermc/paperclip/Paperclip.class")
-                                    != null ? Opcodes.V16 : Opcodes.V1_8);
+                    final int opcodes;
+                    if (jarFile.getEntry("META-INF/versions/17/io/papermc/paperclip/Paperclip.class") != null) {
+                        opcodes = Opcodes.V17;
+                    } else if (jarFile.getEntry("META-INF/versions/16/io/papermc/paperclip/Paperclip.class") != null) {
+                        opcodes = Opcodes.V16;
+                    } else if (jarFile.getEntry("META-INF/versions/11/io/papermc/paperclip/Paperclip.class") != null) {
+                        opcodes = Opcodes.V11;
+                    } else {
+                        opcodes = Opcodes.V1_8;
+                    }
+                    return new ServerClipSupport(version, ServerClipType.PAPERCLIP, opcodes);
                 }
             }
             // YatoClip support

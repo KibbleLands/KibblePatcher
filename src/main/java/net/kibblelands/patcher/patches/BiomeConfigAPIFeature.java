@@ -33,6 +33,7 @@ public class BiomeConfigAPIFeature implements Opcodes {
     private static final String NMS_GRASS_COLOR = "net/minecraft/server/$NMS/BiomeFog$GrassColor";
     private static final String NMS_CRAFT_BLOCK = "org/bukkit/craftbukkit/$NMS/block/CraftBlock";
     private static final String NMS_CRAFT_WORLD = "org/bukkit/craftbukkit/$NMS/CraftWorld";
+    private static final String NMS_CRAFT_REGION_ACCESSOR = "org/bukkit/craftbukkit/$NMS/CraftRegionAccessor";
     private static final String NMS_CRAFT_PARTICLE = "org/bukkit/craftbukkit/$NMS/CraftParticle";
     private static final String NMS_CRAFT_SOUND = "org/bukkit/craftbukkit/$NMS/CraftSound";
 
@@ -59,10 +60,21 @@ public class BiomeConfigAPIFeature implements Opcodes {
         String BIOME_FOG = commonGenerator.mapClass(NMS_BIOME_FOG);
         String CRAFT_BLOCK = commonGenerator.mapClass(NMS_CRAFT_BLOCK);
         String CRAFT_WORLD = commonGenerator.mapClass(NMS_CRAFT_WORLD);
+        String CRAFT_REGION_ACCESSOR = commonGenerator.mapClass(NMS_CRAFT_REGION_ACCESSOR);
         String GRASS_COLOR = commonGenerator.mapClass(NMS_GRASS_COLOR);
         ClassNode craftWorldNode = new ClassNode();
-        new ClassReader(map.get(CRAFT_WORLD+".class")).accept(craftWorldNode, ClassReader.SKIP_FRAMES);
+        String craftWorldNodeName = CRAFT_WORLD;
+        new ClassReader(map.get(CRAFT_WORLD+".class"))
+                .accept(craftWorldNode, ClassReader.SKIP_FRAMES);
         MethodNode setBiome = ASMUtils.findMethod(craftWorldNode, "setBiome", "(IIIL"+BUKKIT_BIOME+";)V");
+        // Region accessor contain new setBiome code in newer versions of Bukkit
+        if (CRAFT_REGION_ACCESSOR.equals(craftWorldNode.superName) && setBiome == null) {
+            craftWorldNode = new ClassNode();
+            craftWorldNodeName = CRAFT_REGION_ACCESSOR;
+            new ClassReader(map.get(CRAFT_REGION_ACCESSOR+".class"))
+                    .accept(craftWorldNode, ClassReader.SKIP_FRAMES);
+            setBiome = ASMUtils.findMethod(craftWorldNode, "setBiome", "(IIIL"+BUKKIT_BIOME+";)V");
+        }
         if (setBiome == null) {
             System.out.println("WTF? Err 0x00");
             return;
@@ -303,7 +315,7 @@ public class BiomeConfigAPIFeature implements Opcodes {
         classWriter = new ClassWriter(0);
         biomeFog.accept(classWriter);
         map.put(BIOME_FOG+".class", classWriter.toByteArray());
-        map.put(CRAFT_WORLD+".class", newCraftWorld);
+        map.put(craftWorldNodeName+".class", newCraftWorld);
         installLib(map, inject);
         commonGenerator.addChangeEntry("Added BiomeConfigAPI. " + ConsoleColors.CYAN + "(Feature)");
     }
